@@ -319,6 +319,330 @@ function enterOut(){
  for(let i=0;i<5;i++)mobs.push({kind:"cow",x:(-70+i*42+hash(i*8.1)*10)*T,d:-1,t:hash(i+9)*3,hh:0,hv:0});
  mobs.push({kind:"sheep",x:14*T,d:0,t:1,hh:0,hv:0},{kind:"pig",x:19*T,d:-1,t:2,hh:0,hv:0},{kind:"cow",x:26*T,d:1,t:1.5,hh:0,hv:0});
  mobs.push({kind:"villager",x:8*T,d:-1,t:99,hh:0,hv:0});
+ tone(520,.2,"triangle",.0
+cd ~/pixelated-game
+cat << 'EOF' > index.html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>pixelated-game</title>
+<style>
+html,body{margin:0;height:100%;background:#0b0a10;overflow:hidden}
+body{display:flex;align-items:center;justify-content:center}
+canvas{width:min(100vw,calc(100vh*25/14));height:auto;aspect-ratio:25/14;background:#000;cursor:crosshair}
+</style>
+</head>
+<body>
+<canvas id="c" width="800" height="448"></canvas>
+<script>
+"use strict";
+const cv=document.getElementById("c"),g=cv.getContext("2d");
+const T=32,COLS=25,ROWS=14,W=800,H=448;
+const CFG={speed:190,grav:1800,jump:600,coyote:.1,buf:.1,reach:3.6,pushT:.25,crateFall:.08,player:{w:22,h:44}};
+
+const row=(...p)=>p.join("");
+const BED="B".repeat(25);
+const dots=n=>".".repeat(n);
+const LV=[
+{n:"First Shift",hint:"1/2/3 hotbar · Left-click mine/place/torch · Right-click place stone · Dig through.",time:0,map:[
+ BED,
+ ...Array(10).fill(row("B",dots(11),"#*#",dots(9),"B")),
+ row("B.@.........","#*#","......E..","B"),
+ BED,BED]},
+{n:"Rusty Key",hint:"Watch out for Creepers & bats · Grab the key, unlock the door.",time:0,map:[
+ BED,
+ ...Array(6).fill(row("B",dots(17),"B",dots(5),"B")),
+ row("B",dots(8),"k",dots(8),"B",dots(5),"B"),
+ row("B",dots(7),"#*#",dots(7),"B",dots(5),"B"),
+ row("B",dots(17),"B",dots(5),"B"),
+ row("B",dots(3),"#*#",dots(11),"D",dots(5),"B"),
+ row("B.@",dots(15),"D",dots(3),"E.B"),
+ BED,BED]},
+{n:"Dead Weight",hint:"Push the crate onto the plate to hold the gate open. 60 seconds.",time:60,map:[
+ BED,
+ ...Array(7).fill(row("B",dots(14),"B",dots(8),"B")),
+ ...Array(3).fill(row("B",dots(14),"G",dots(8),"B")),
+ row("B.@.C",dots(5),"P",dots(4),"G",dots(5),"E..B"),
+ BED,BED]},
+{n:"Build Your Way Out",hint:"Mine stone & ores, select slot 2 (or right-click) to place blocks and climb. 90s.",time:90,map:[
+ BED,
+ ...Array(3).fill(row("B",dots(23),"B")),
+ row("B",dots(21),"E.B"),
+ row("B",dots(18),"##*##","B"),
+ ...Array(2).fill(row("B",dots(23),"B")),
+ ...Array(3).fill(row("B",dots(5),"##*##",dots(13),"B")),
+ row("B.@",dots(3),"##*##",dots(13),"B"),
+ BED,BED]},
+{n:"Daybreak",hint:"Place torches (slot 3) in the dark, flip the lever, and reach E. 80s.",time:80,map:[
+ BED,
+ ...Array(5).fill(row("B",dots(15),"B",dots(7),"B")),
+ row("B",dots(5),"L",dots(9),"B",dots(7),"B"),
+ row("B",dots(4),"##*#",dots(7),"G",dots(7),"B"),
+ row("B",dots(15),"G",dots(7),"B"),
+ ...Array(2).fill(row("B",dots(9),"#*#",dots(3),"G",dots(7),"B")),
+ row("B.@",dots(7),"#*#",dots(3),"G",dots(4),"E..B"),
+ BED,BED]}
+];
+
+let state="title",lvl=0,t=0,runT=0,shake=0,muted=false,mouse={x:0,y:0};
+let grid,crates,keysT,plates,levers,P,exitT,inv,torchesCount,placedTorches,bats,creepers,hasKey,timeLeft,pushT=0,coy=0,buf=0,msg="",slot=0;
+let levelTorches=[],swingT=0,crack={x:-1,y:-1,n:0},md=-1,mcd=0;
+const K={l:0,r:0,u:0},SP=[];
+for(let i=0;i<80;i++)SP.push({l:0,x:0,y:0,vx:0,vy:0,c:"#888"});
+const hash=n=>Math.abs(Math.sin(n*127.1)*43758.5)%1;
+
+const dk=document.createElement("canvas");dk.width=W;dk.height=H;const dx=dk.getContext("2d");
+const lightSpr=document.createElement("canvas");lightSpr.width=lightSpr.height=256;
+{const lx=lightSpr.getContext("2d"),lg=lx.createRadialGradient(128,128,8,128,128,128);
+lg.addColorStop(0,"rgba(0,0,0,1)");lg.addColorStop(1,"rgba(0,0,0,0)");
+lx.fillStyle=lg;lx.fillRect(0,0,256,256)}
+
+let ac,nb;
+function audio(){if(!ac)try{ac=new(window.AudioContext||window.webkitAudioContext)()}catch(e){}}
+function tone(f,d,ty,v,sl,delay=0){
+ if(!ac||muted)return;
+ const o=ac.createOscillator(),n=ac.createGain(),a=ac.currentTime+delay;
+ o.type=ty||"square";o.frequency.setValueAtTime(f,a);
+ if(sl)o.frequency.exponentialRampToValueAtTime(Math.max(30,f*sl),a+d);
+ n.gain.setValueAtTime(v||.07,a);n.gain.exponentialRampToValueAtTime(.0001,a+d);
+ o.connect(n);n.connect(ac.destination);o.start(a);o.stop(a+d);
+}
+function dust(x,y,n,c,pw){
+ for(let i=0,k=0;i<SP.length&&k<n;i++){const p=SP[i];
+  if(p.l<=0){p.l=.4+Math.random()*.4;p.x=x;p.y=y;p.vx=(Math.random()-.5)*pw;p.vy=-Math.random()*pw*.7;p.c=c;k++}}
+}
+function noise(d,f,v,q){
+ if(!ac||muted)return;
+ if(!nb){nb=ac.createBuffer(1,ac.sampleRate,ac.sampleRate);const a=nb.getChannelData(0);for(let i=0;i<a.length;i++)a[i]=Math.random()*2-1}
+ const s=ac.createBufferSource(),fl=ac.createBiquadFilter(),n=ac.createGain(),a0=ac.currentTime;
+ s.buffer=nb;fl.type="bandpass";fl.frequency.value=f;fl.Q.value=q||1;
+ n.gain.setValueAtTime(v,a0);n.gain.exponentialRampToValueAtTime(.0001,a0+d);
+ s.connect(fl);fl.connect(n);n.connect(ac.destination);s.start(a0,Math.random()*.5);s.stop(a0+d);
+}
+const SFX={
+ mine(){noise(.09,900,.3,2);tone(190,.08,"square",.05,.5)},
+ brk(){noise(.28,450,.4,1);tone(110,.2,"sawtooth",.06,.4)},
+ place(){noise(.06,300,.25,1);tone(160,.07,"square",.06,.7)},
+ step(grass){noise(.045,grass?1500:650,.07,1.5)},
+ land(){noise(.12,240,.18,1)},
+ drip(){tone(1300+Math.random()*500,.14,"sine",.035,.4)},
+ baa(){tone(330,.45,"sawtooth",.045,.62);tone(342,.45,"sawtooth",.03,.6)},
+ chirp(){tone(2400,.05,"sine",.04,1.3);tone(2900,.06,"sine",.04,1.2,.08)},
+ hiss(){noise(.22,2200,.18,3)},
+ boom(){noise(.45,180,.55,.7);tone(75,.35,"sawtooth",.12,.3)}
+};
+let stepT=0,dripT=2,prevG=true,fallV=0;
+function extras(dt){
+ mcd-=dt;if(md===0&&mcd<=0&&state==="play"){act(0);mcd=.24}
+ if(swingT>0)swingT-=dt;
+ stepT-=dt;if(P.onG&&Math.abs(P.vx)>1&&stepT<=0){SFX.step(state==="out");stepT=.27}
+ if(!P.onG)fallV=Math.max(fallV,P.vy);else{if(!prevG&&fallV>320)SFX.land();fallV=0}
+ prevG=P.onG;
+ if(state==="play"){dripT-=dt;if(dripT<=0){SFX.drip();dripT=2+Math.random()*4}}
+}
+
+function cacheTorches(){
+ levelTorches=[];
+ for(let x=3;x<COLS-2;x+=6){
+  const y=3+((hash(x*3.3+lvl*7)*4)|0);
+  if(grid[y][x]==="."&&!(exitT&&x===exitT.x&&y===exitT.y))levelTorches.push({x,y});
+ }
+}
+function load(i){
+ crack.n=0;
+ const L=LV[i];grid=L.map.map(r=>r.split(""));
+ crates=[];keysT=[];plates=[];levers=[];placedTorches=[];bats=[];creepers=[];exitT=null;
+ inv=0;torchesCount=2;hasKey=false;timeLeft=L.time;pushT=0;
+ const openSpots=[];
+ for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){
+  const c=grid[y][x];
+  if(c==="@"){P={x:x*T+5,y:(y+1)*T-CFG.player.h,w:CFG.player.w,h:CFG.player.h,vx:0,vy:0,onG:false,face:1};grid[y][x]="."}
+  else if(c==="E"){exitT={x,y};grid[y][x]="."}
+  else if(c==="k"){keysT.push({x,y});grid[y][x]="."}
+  else if(c==="P"){plates.push({x,y});grid[y][x]="."}
+  else if(c==="L"){levers.push({x,y,on:false});grid[y][x]="."}
+  else if(c==="C"){crates.push({x,y,fall:0});grid[y][x]="."}
+  else if(c==="."&&y>=2&&y<=ROWS-3&&x>=6&&x<=COLS-4)openSpots.push({x,y});
+ }
+ cacheTorches();
+ for(let b=0;b<2+i;b++){
+  const sp=openSpots[(b*7+i*3)%Math.max(1,openSpots.length)];
+  if(sp)bats.push({x:sp.x*T+16,y:sp.y*T+12,baseY:sp.y*T+12,ph:b*1.7,dir:b%2?1:-1});
+ }
+ if(i>=1){
+  for(let cr=0;cr<Math.min(2,i);cr++){
+   const sp=openSpots[(cr*11+i*5+2)%Math.max(1,openSpots.length)];
+   if(sp&&grid[sp.y+1]&&grid[sp.y+1][sp.x]!=="."){
+    creepers.push({x:sp.x*T+6,y:(sp.y+1)*T-28,w:18,h:28,vx:0,vy:0,dir:cr%2?1:-1,fuse:0,alive:true});
+   }
+  }
+ }
+}
+const crateAt=(x,y)=>crates.find(c=>c.x===x&&c.y===y);
+const plateDown=p=>!!crateAt(p.x,p.y)||(P.x<(p.x+1)*T&&P.x+P.w>p.x*T&&P.y<(p.y+1)*T&&P.y+P.h>p.y*T);
+const powered=()=>levers.some(l=>l.on)||plates.some(plateDown);
+function solidMine(x,y){
+ if(x<0||y<0||x>=COLS||y>=ROWS)return true;
+ const c=grid[y][x];
+ if(c==="#"||c==="*"||c==="B"||c==="D")return true;
+ if(c==="G"&&!powered())return true;
+ return !!crateAt(x,y);
+}
+function solid(x,y){return state==="out"?y>=sh(x):solidMine(x,y)}
+const occupied=(x,y)=>keysT.some(k=>k.x===x&&k.y===y)||plates.some(p=>p.x===x&&p.y===y)||levers.some(l=>l.x===x&&l.y===y)||placedTorches.some(tr=>tr.x===x&&tr.y===y)||(exitT&&exitT.x===x&&exitT.y===y);
+const bnd=()=>[Math.floor(P.x/T),Math.floor((P.x+P.w-.01)/T),Math.floor(P.y/T),Math.floor((P.y+P.h-.01)/T)];
+
+function moveX(dt){
+ P.x+=P.vx*dt;
+ const[x0,x1,y0,y1]=bnd();let hitCrate=false;
+ for(let ty=y0;ty<=y1;ty++)for(let tx=x0;tx<=x1;tx++)if(solid(tx,ty)){
+  if(P.vx>0)P.x=tx*T-P.w;else if(P.vx<0)P.x=(tx+1)*T;
+  const c=state==="play"?crateAt(tx,ty):null;
+  if(c&&P.vx!==0){
+   hitCrate=true;pushT+=dt;
+   if(pushT>CFG.pushT){const nx=c.x+Math.sign(P.vx);if(!solid(nx,c.y)){c.x=nx;tone(110,.08,"square",.05)}pushT=0}
+  }
+  if(!hitCrate)pushT=0;
+  return;
+ }
+ pushT=0;
+}
+function moveY(dt){
+ P.y+=P.vy*dt;P.onG=false;
+ const[x0,x1,y0,y1]=bnd();
+ for(let ty=y0;ty<=y1;ty++)for(let tx=x0;tx<=x1;tx++)if(solid(tx,ty)){
+  if(P.vy>0){P.y=ty*T-P.h;P.onG=true}else if(P.vy<0)P.y=(ty+1)*T;
+  P.vy=0;return;
+ }
+}
+function crackDraw(){
+ if(crack.n>0){const X=crack.x*T,Y=crack.y*T;g.strokeStyle="rgba(0,0,0,.65)";g.lineWidth=2;g.beginPath();g.moveTo(X+6,Y+4);g.lineTo(X+16,Y+16);g.lineTo(X+10,Y+28);g.moveTo(X+16,Y+16);g.lineTo(X+27,Y+22);g.stroke()}
+}
+function placeStone(tx,ty){
+ if(grid[ty][tx]==="."&&inv>0&&!crateAt(tx,ty)&&!occupied(tx,ty)){
+  const ov=P.x<(tx+1)*T&&P.x+P.w>tx*T&&P.y<(ty+1)*T&&P.y+P.h>ty*T;
+  if!ov[tx]="#";inv--;SFX.place()}
+ }
+}
+function act(btn){
+ const tx=Math.floor(mouse.x/T),ty=Math.floor(mouse.y/T);
+ if(tx<0||ty<0||tx>=COLS||ty>=ROWS)return;
+ if(Math.hypot(tx*T+T/2-(P.x+P.w/2),ty*T+T/2-(P.y+P.h/2))>CFG.reach*T)return;
+ P.face=mouse.x>P.x+P.w/2?1:-1;
+ if(btn===2){placeStone(tx,ty);return}
+ if(btn===0){
+  if(slot===1){placeStone(tx,ty);return}
+  if(slot===2){
+   if(grid[ty][tx]==="."&&torchesCount>0&&!crateAt(tx,ty)&&!occupied(tx,ty)){
+    placedTorches.push({x:tx,y:ty});torchesCount--;SFX.place();
+   }
+   return;
+  }
+  const tile=grid[ty][tx];
+  if(tile==="#"||tile==="*"){
+   swingT=.2;
+   const req=tile==="*"?1:2;
+   if(crack.x===tx&&crack.y===ty)crack.n++;else crack={x:tx,y:ty,n:1};
+   if(crack.n>=req){
+    grid[ty][tx]=".";inv+=tile==="*"?2:1;
+    if(tile==="*")torchesCount++;
+    crack={x:-1,y:-1,n:0};
+    dust(tx*T+16,ty*T+16,11,tile==="*"?"#ffd166":"#8d8696",220);SFX.brk();
+   }else{SFX.mine();dust(tx*T+16,ty*T+16,3,"#8d8696",120)}
+  }
+ }
+}
+function interact(){
+ for(const l of levers)if(Math.hypot(l.x*T+16-(P.x+11),l.y*T+16-(P.y+22))<T*1.6){l.on=!l.on;tone(260,.1,"square",.07,l.on?1.6:.6)}
+}
+function detonateCreeper(cr){
+ cr.alive=false;shake=12;SFX.boom();
+ const cx=Math.floor((cr.x+cr.w/2)/T),cy=Math.floor((cr.y+cr.h/2)/T);
+ dust(cx*T+16,cy*T+16,24,"#78c850",280);
+ for(let dy=-1;dy<=1;dy++)for(let dx2=-1;dx2<=1;dx2++){
+  const nx=cx+dx2,ny=cy+dy;
+  if(ny>0&&ny<ROWS-1&&nx>0&&nx<COLS-1&&(grid[ny][nx]==="#"||grid[ny][nx]==="*")){
+   grid[ny][nx]=".";inv++;
+  }
+ }
+ if(Math.hypot(P.x+P.w/2-(cx*T+16),P.y+P.h/2-(cy*T+16))<T*2.2){
+  state="over";msg="Blasted by a Creeper.";
+ }
+}
+function update(dt){
+ runT+=dt;extras(dt);
+ if(timeLeft>0||LV[lvl].time){
+  timeLeft-=dt;
+  if(timeLeft<=10&&timeLeft>0){shake=Math.max(shake,2.5);if(Math.random()<dt*14)dust(Math.random()*W,0,2,"#6b6470",60)}
+  if(timeLeft<=0){state="over";msg="The ceiling came down.";tone(70,.8,"sawtooth",.12,.4);shake=14;return}
+ }
+ const dir=K.r-K.l;P.vx=dir*CFG.speed;if(dir)P.face=dir;
+ P.vy=Math.min(900,P.vy+CFG.grav*dt);
+ coy=P.onG?CFG.coyote:coy-dt;buf-=dt;
+ if(buf>0&&coy>0){P.vy=-CFG.jump;coy=0;buf=0;P.onG=false;tone(330,.12,"square",.05,1.8)}
+ moveX(dt);moveY(dt);
+
+ for(const b of bats){
+  b.x+=b.dir*44*dt;
+  b.y=b.baseY+Math.sin(t*7+b.ph)*8;
+  const gx=Math.floor(b.x/T);
+  if(gx<=1||gx>=COLS-2||solidMine(gx,Math.floor(b.y/T)))b.dir*=-1;
+ }
+ for(const cr of creepers){
+  if(!cr.alive)continue;
+  const dist=Math.hypot(P.x+P.w/2-(cr.x+cr.w/2),P.y+P.h/2-(cr.y+cr.h/2));
+  if(dist<T*4.5){
+   cr.dir=P.x+P.w/2>cr.x+cr.w/2?1:-1;
+   cr.vx=cr.dir*95;
+   if(dist<T*1.4){if(cr.fuse===0)SFX.hiss();cr.fuse+=dt;if(cr.fuse>=.85){detonateCreeper(cr);if(state==="over")return}}
+   else cr.fuse=Math.max(0,cr.fuse-dt*1.5);
+  }else{cr.vx=cr.dir*42;cr.fuse=0}
+  cr.vy=Math.min(900,cr.vy+CFG.grav*dt);
+  cr.x+=cr.vx*dt;
+  let cx0=Math.floor(cr.x/T),cx1=Math.floor((cr.x+cr.w-.01)/T),cy0=Math.floor(cr.y/T),cy1=Math.floor((cr.y+cr.h-.01)/T);
+  for(let ty=cy0;ty<=cy1;ty++)for(let tx=cx0;tx<=cx1;tx++)if(solidMine(tx,ty)){
+   if(cr.vx>0)cr.x=tx*T-cr.w;else if(cr.vx<0)cr.x=(tx+1)*T;
+   cr.dir*=-1;
+  }
+  cr.y+=cr.vy*dt;
+  cx0=Math.floor(cr.x/T);cx1=Math.floor((cr.x+cr.w-.01)/T);cy0=Math.floor(cr.y/T);cy1=Math.floor((cr.y+cr.h-.01)/T);
+  for(let ty=cy0;ty<=cy1;ty++)for(let tx=cx0;tx<=cx1;tx++)if(solidMine(tx,ty)){
+   if(cr.vy>0)cr.y=ty*T-cr.h;else if(cr.vy<0)cr.y=(ty+1)*T;
+   cr.vy=0;
+  }
+ }
+
+ for(const c of crates){
+  const below=solidMine(c.x,c.y+1),inP=P.x<(c.x+1)*T&&P.x+P.w>c.x*T&&P.y<(c.y+2)*T&&P.y+P.h>(c.y+1)*T;
+  if(!below&&!inP){c.fall+=dt;if(c.fall>CFG.crateFall){c.y++;c.fall=0}}else c.fall=0;
+ }
+ for(let i=keysT.length-1;i>=0;i--){const k=keysT[i];
+  if(P.x<(k.x+1)*T&&P.x+P.w>k.x*T&&P.y<(k.y+1)*T&&P.y+P.h>k.y*T){keysT.splice(i,1);hasKey=true;tone(700,.2,"triangle",.08,1.6)}}
+ if(hasKey){
+  const[x0,x1,y0,y1]=bnd();
+  for(let ty=y0;ty<=y1;ty++)for(let tx=x0-1;tx<=x1+1;tx++)if(grid[ty]&&grid[ty][tx]==="D"){
+   for(let y=0;y<ROWS;y++)if(grid[y][tx]==="D")grid[y][tx]=".";
+   hasKey=false;dust(tx*T+16,ty*T,14,"#a8743a",260);tone(180,.3,"sawtooth",.08,.5);
+  }
+ }
+ if(exitT&&Math.floor((P.x+P.w/2)/T)===exitT.x&&Math.floor((P.y+P.h/2)/T)===exitT.y){
+  state=lvl===LV.length-1?"end":"clear";tone(520,.25,"triangle",.09);tone(660,.3,"triangle",.09,.15);
+ }
+}
+
+const SURF={lim:150,home:3};
+const sh=x=>Math.abs(x-SURF.home)<6?9:9+Math.round(Math.sin(x*.11)*1.6+Math.sin(x*.047+2)*2.2);
+let mobs=[],camX=0,outT=0,birdT=3;
+function enterOut(){
+ state="out";outT=0;P.x=SURF.home*T+6;P.y=sh(SURF.home)*T-P.h-2;P.vx=P.vy=0;P.onG=false;
+ mobs=[];
+ for(let i=0;i<14;i++)mobs.push({kind:"sheep",x:(-140+i*21+hash(i*3.1)*12)*T,d:0,t:hash(i)*3,hh:0,hv:0});
+ for(let i=0;i<6;i++)mobs.push({kind:"pig",x:(-90+i*34+hash(i*5.2)*10)*T,d:1,t:hash(i+4)*3,hh:0,hv:0});
+ for(let i=0;i<5;i++)mobs.push({kind:"cow",x:(-70+i*42+hash(i*8.1)*10)*T,d:-1,t:hash(i+9)*3,hh:0,hv:0});
+ mobs.push({kind:"sheep",x:14*T,d:0,t:1,hh:0,hv:0},{kind:"pig",x:19*T,d:-1,t:2,hh:0,hv:0},{kind:"cow",x:26*T,d:1,t:1.5,hh:0,hv:0});
+ mobs.push({kind:"villager",x:8*T,d:-1,t:99,hh:0,hv:0});
  tone(520,.2,"triangle",.07);
 }
 function updateOut(dt){

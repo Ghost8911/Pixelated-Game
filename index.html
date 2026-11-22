@@ -39,6 +39,7 @@ let jumpBuffer = 0;
 let walkTime = 0;
 let muted = false;
 let audioCtx = null;
+const particles = [];
 
 function sfx(freq, dur, type = "square", vol = 0.05) {
   if (muted) return;
@@ -57,6 +58,32 @@ function sfx(freq, dur, type = "square", vol = 0.05) {
   gain.connect(audioCtx.destination);
   osc.start();
   osc.stop(audioCtx.currentTime + dur);
+}
+
+function spawnBurst(x, y, color, count = 10) {
+  for (let i = 0; i < count; i++) {
+    const ang = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.4;
+    const spd = 70 + Math.random() * 140;
+    particles.push({
+      x,
+      y,
+      vx: Math.cos(ang) * spd,
+      vy: Math.sin(ang) * spd - 50,
+      life: 0.35 + Math.random() * 0.15,
+      color
+    });
+  }
+}
+
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.vy += 420 * dt;
+    p.life -= dt;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
 }
 
 function resizeCanvas() {
@@ -152,6 +179,7 @@ function hurtPlayer() {
   if (hurtTimer > 0) return;
   lives -= 1;
   sfx(140, 0.22, "sawtooth", 0.06);
+  spawnBurst(player.x + player.w / 2, player.y + player.h / 2, "#ff6b6b", 12);
   if (lives <= 0) {
     lives = 0;
     gameOver = true;
@@ -176,6 +204,7 @@ function loadStage(idx) {
   enemy.x = s.enemyX * TILE;
   enemy.vx = -60 - stageIdx * 12;
   enemy.alive = true;
+  particles.length = 0;
   won = false;
   resetPlayer();
 }
@@ -273,6 +302,7 @@ function updateEnemy(dt, prevVy) {
       player.onGround = false;
       score += 200;
       sfx(460, 0.1, "square", 0.06);
+      spawnBurst(enemy.x + enemy.w / 2, enemy.y + enemy.h / 2, "#ffd166", 12);
     } else {
       hurtPlayer();
     }
@@ -290,6 +320,7 @@ function updateStageItems() {
       coins++;
       score += 100;
       sfx(1180, 0.09, "square", 0.05);
+      spawnBurst(c.x * TILE + 16, c.y * TILE + 16, "#ffd166", 7);
     }
   }
 
@@ -306,12 +337,16 @@ function updateStageItems() {
   const gx = Math.floor((player.x + player.w / 2) / TILE);
   const gy = Math.floor((player.y + player.h + 2) / TILE);
   if (grid[gy] && grid[gy][gx] === "=") {
-    if (!won) sfx(784, 0.22, "triangle", 0.07);
+    if (!won) {
+      sfx(784, 0.22, "triangle", 0.07);
+      spawnBurst(gx * TILE + 16, gy * TILE, "#38b000", 16);
+    }
     won = true;
   }
 }
 
 function update(dt) {
+  updateParticles(dt);
   if (won || gameOver) return;
   const prevVy = updatePlayer(dt);
   updateEnemy(dt, prevVy);
@@ -368,9 +403,29 @@ function drawEnemy() {
   ctx.restore();
 }
 
+function drawSkyBody() {
+  if (stageIdx === 0) {
+    ctx.fillStyle = "#fef08a";
+    ctx.beginPath();
+    ctx.arc(viewW - 120, 82, 24, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (stageIdx === 1) {
+    ctx.fillStyle = "#fde047";
+    ctx.beginPath();
+    ctx.arc(viewW - 130, 86, 28, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    ctx.fillStyle = "#fb923c";
+    ctx.beginPath();
+    ctx.arc(viewW - 140, 128, 34, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
 function render() {
   ctx.fillStyle = STAGES[stageIdx].sky;
   ctx.fillRect(0, 0, viewW, viewH);
+  drawSkyBody();
 
   ctx.fillStyle = "rgba(0, 0, 0, 0.22)";
   for (let hx = -200; hx < viewW + 200; hx += 220) {
@@ -428,6 +483,11 @@ function render() {
 
   drawEnemy();
   drawPlayer();
+
+  for (const p of particles) {
+    ctx.fillStyle = p.color;
+    ctx.fillRect(p.x - 2, p.y - 2, 4, 4);
+  }
   ctx.restore();
 
   ctx.fillStyle = "#fff";
@@ -456,6 +516,7 @@ window.addEventListener("keydown", e => {
     dashCooldown = 0.62;
     player.vy = 0;
     sfx(480, 0.08, "triangle", 0.05);
+    spawnBurst(player.x + player.w / 2, player.y + player.h / 2, "#ffd166", 6);
   }
   if (e.code === "KeyM") muted = !muted;
   if ((e.code === "KeyN" || e.code === "Enter") && won) {

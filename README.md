@@ -12,4 +12,4 @@ Hey, this is a game I made called Zephrys.
 - Dash: Shift or K
 - Restart: R · Mute: M · Quit/Back: Q or Esc
 
-Just open `index.html` in a browser or play it on GitHub Pages.
+Just copy and paste it in any web browser `https://ghost8911.github.io/Pixelated-Game/` to play it

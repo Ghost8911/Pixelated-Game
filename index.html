@@ -82,8 +82,6 @@ let stageIdx = 0;
 let grid = [];
 let coinList = [];
 let spikes = [];
-let coins = 0;
-let won = false;
 
 const player = {
   x: 64,
@@ -121,6 +119,26 @@ function resetPlayer() {
   player.vy = 0;
   camX = 0;
 }
+
+function loadStage(idx) {
+  stageIdx = idx % STAGES.length;
+  const s = STAGES[stageIdx];
+  grid = Array.from({ length: ROWS }, (_, r) =>
+    Array.from({ length: cols }, (__, c) => (r >= 12 ? "G" : "."))
+  );
+  for (const px of s.pit) { grid[12][px] = "."; grid[13][px] = "."; }
+  for (const [by, bx] of s.bricks) grid[by][bx] = "#";
+  grid[11][27] = "=";
+
+  coinList = s.coins.map(([x, y]) => ({ x, y, taken: false }));
+  spikes = s.spikes.map(([x, y]) => ({ x, y }));
+  enemy.x = s.enemyX * TILE;
+  enemy.vx = -60 - stageIdx * 12;
+  enemy.alive = true;
+  won = false;
+  resetPlayer();
+}
+loadStage(0);
 
 function updatePlayer(dt) {
   const dir = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
@@ -241,7 +259,7 @@ function update(dt) {
 }
 
 function render() {
-  ctx.fillStyle = "#191a2e";
+  ctx.fillStyle = STAGES[stageIdx].sky;
   ctx.fillRect(0, 0, viewW, viewH);
 
   ctx.save();
@@ -292,11 +310,11 @@ function render() {
 
   ctx.fillStyle = "#fff";
   ctx.font = "bold 14px monospace";
-  ctx.fillText(`LIVES x${lives}  COINS x${coins}  SCORE ${score}`, 14, 24);
+  ctx.fillText(`${STAGES[stageIdx].name} | LIVES x${lives}  COINS x${coins}  SCORE ${score}`, 14, 24);
   if (won) {
     ctx.fillStyle = "#ffd166";
-    ctx.font = "bold 24px monospace";
-    ctx.fillText("STAGE CLEAR! Press R to replay", 14, 64);
+    ctx.font = "bold 22px monospace";
+    ctx.fillText("STAGE CLEAR! Press N for next stage or R to replay", 14, 64);
   }
 }
 
@@ -313,14 +331,14 @@ window.addEventListener("keydown", e => {
     dashCooldown = 0.62;
     player.vy = 0;
   }
+  if ((e.code === "KeyN" || e.code === "Enter") && won) {
+    loadStage(stageIdx + 1);
+  }
   if (e.code === "KeyR") {
-    won = false;
     lives = 3;
     score = 0;
     coins = 0;
-    enemy.alive = true;
-    coinList.forEach(c => (c.taken = false));
-    resetPlayer();
+    loadStage(0);
   }
 });
 window.addEventListener("keyup", e => {

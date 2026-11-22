@@ -201,7 +201,6 @@ function placeStone(tx,ty){
   const ov=P.x<(tx+1)*T&&P.x+P.w>tx*T&&P.y<(ty+1)*T&&P.y+P.h>ty*T;
   if!ov[tx]="#";inv--;SFX.place()}
  }
- const tx=Math.floor(mouse.x/T),ty=Math.floor(mouse.y/T);
  if(tx<0||ty<0||tx>=COLS||ty>=ROWS)return;
  if(Math.hypot(tx*T+T/2-(P.x+P.w/2),ty*T+T/2-(P.y+P.h/2))>CFG.reach*T)return;
  P.face=mouse.x>P.x+P.w/2?1:-1;

@@ -14,5 +14,7 @@ Hey, this is a game I made called **Zephrys**.
 - **Mute SFX:** `M`
 - **Quit / Toggle Pause:** `Q`
 
+- **AI note:** Built a smaller single-screen version by hand as I typed it out; used AI sparingly for quick sanity checks.
+
 ## Play
 Open it directly in any web browser at **[https://ghost8911.github.io/Pixelated-Game/](https://ghost8911.github.io/Pixelated-Game/)** or open `index.html` locally.

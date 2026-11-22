@@ -29,9 +29,11 @@ let lives = 3;
 let score = 0;
 let coins = 0;
 let won = false;
+let gameOver = false;
 let camX = 0;
 let dashTimer = 0;
 let dashCooldown = 0;
+let hurtTimer = 0;
 let coyoteTimer = 0;
 let jumpBuffer = 0;
 let walkTime = 0;
@@ -146,6 +148,19 @@ function resetPlayer() {
   camX = 0;
 }
 
+function hurtPlayer() {
+  if (hurtTimer > 0) return;
+  lives -= 1;
+  sfx(140, 0.22, "sawtooth", 0.06);
+  if (lives <= 0) {
+    lives = 0;
+    gameOver = true;
+    return;
+  }
+  hurtTimer = 1.0;
+  resetPlayer();
+}
+
 function loadStage(idx) {
   stageIdx = idx % STAGES.length;
   const s = STAGES[stageIdx];
@@ -167,6 +182,7 @@ function loadStage(idx) {
 loadStage(0);
 
 function updatePlayer(dt) {
+  if (hurtTimer > 0) hurtTimer -= dt;
   const dir = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
   if (dir !== 0 && dashTimer <= 0) player.facing = dir;
 
@@ -229,9 +245,8 @@ function updatePlayer(dt) {
   }
 
   if (player.y > ROWS * TILE + 20) {
-    lives = Math.max(1, lives - 1);
-    sfx(140, 0.22, "sawtooth", 0.06);
-    resetPlayer();
+    hurtTimer = 0;
+    hurtPlayer();
   }
 
   camX = Math.max(0, Math.min(cols * TILE - viewW, player.x - viewW * 0.35));
@@ -259,9 +274,7 @@ function updateEnemy(dt, prevVy) {
       score += 200;
       sfx(460, 0.1, "square", 0.06);
     } else {
-      lives = Math.max(1, lives - 1);
-      sfx(140, 0.22, "sawtooth", 0.06);
-      resetPlayer();
+      hurtPlayer();
     }
   }
 }
@@ -285,9 +298,7 @@ function updateStageItems() {
       player.x < s.x * TILE + 26 && player.x + player.w > s.x * TILE + 6 &&
       player.y < s.y * TILE + 32 && player.y + player.h > s.y * TILE + 12
     ) {
-      lives = Math.max(1, lives - 1);
-      sfx(140, 0.22, "sawtooth", 0.06);
-      resetPlayer();
+      hurtPlayer();
       return;
     }
   }
@@ -301,13 +312,14 @@ function updateStageItems() {
 }
 
 function update(dt) {
-  if (won) return;
+  if (won || gameOver) return;
   const prevVy = updatePlayer(dt);
   updateEnemy(dt, prevVy);
   updateStageItems();
 }
 
 function drawPlayer() {
+  if (hurtTimer > 0 && Math.floor(hurtTimer * 16) % 2 === 0) return;
   const moving = Math.abs(player.vx) > 10 && player.onGround;
   if (moving) walkTime += 0.22;
   else walkTime = 0;
@@ -425,6 +437,10 @@ function render() {
     ctx.fillStyle = "#ffd166";
     ctx.font = "bold 22px monospace";
     ctx.fillText("STAGE CLEAR! Press N for next stage or R to replay", 14, 64);
+  } else if (gameOver) {
+    ctx.fillStyle = "#ff6b6b";
+    ctx.font = "bold 24px monospace";
+    ctx.fillText("GAME OVER! Press R to restart", 14, 64);
   }
 }
 
@@ -449,6 +465,8 @@ window.addEventListener("keydown", e => {
     lives = 3;
     score = 0;
     coins = 0;
+    gameOver = false;
+    hurtTimer = 0;
     loadStage(0);
   }
 });

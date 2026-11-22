@@ -12,7 +12,8 @@
 <canvas id="c"></canvas>
 <script>
 const c = document.getElementById("c"), ctx = c.getContext("2d");
-const p = { x: 60, y: 336, w: 20, h: 24, speed: 220 };
+const ground = 360, grav = 1600;
+const p = { x: 60, y: ground - 24, w: 20, h: 24, speed: 220, vy: 0, grounded: true };
 const keys = {};
 
 addEventListener("resize", () => { c.width = innerWidth; c.height = innerHeight; });
@@ -21,11 +22,24 @@ addEventListener("keyup", e => { keys[e.code] = false; });
 c.width = innerWidth; c.height = innerHeight;
 
 function loop() {
+  const dt = 1 / 60;
   const dir = (keys.ArrowRight || keys.KeyD ? 1 : 0) - (keys.ArrowLeft || keys.KeyA ? 1 : 0);
-  p.x += dir * p.speed * (1 / 60);
+  p.x = Math.max(0, Math.min(c.width - p.w, p.x + dir * p.speed * dt));
+
+  if ((keys.Space || keys.ArrowUp || keys.KeyW) && p.grounded) {
+    p.vy = -620;
+    p.grounded = false;
+  }
+  p.vy += grav * dt;
+  p.y += p.vy * dt;
+  if (p.y >= ground - p.h) {
+    p.y = ground - p.h;
+    p.vy = 0;
+    p.grounded = true;
+  }
 
   ctx.fillStyle = "#191a2e"; ctx.fillRect(0, 0, c.width, c.height);
-  ctx.fillStyle = "#38b000"; ctx.fillRect(0, 360, c.width, c.height - 360);
+  ctx.fillStyle = "#38b000"; ctx.fillRect(0, ground, c.width, c.height - ground);
   ctx.fillStyle = "#e03131"; ctx.fillRect(p.x, p.y, p.w, p.h);
   requestAnimationFrame(loop);
 }

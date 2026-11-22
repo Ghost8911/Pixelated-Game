@@ -4,6 +4,7 @@ Hey, this is a game I made called Zephrys.
 
 - The Purpose: I wanted to create something through which the user can have fun without installing any application
 - The Idea: I was playing mario when I thought about this
+- AI note: Used AI to brainstorm ideas, debug jump/stomp quirks, and help polish UI layouts while writing and tuning the game logic myself.
 
 ## Controls
 - Move: A/D or arrows (or touch pad on phone)

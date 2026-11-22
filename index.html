@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <title>Zephrys</title>
 <style>
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #191a2e; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #191a2e; font-family: monospace; }
   canvas { display: block; width: 100%; height: 100%; }
 </style>
 </head>
@@ -14,8 +14,10 @@
 const c = document.getElementById("c"), ctx = c.getContext("2d");
 const ground = 360, grav = 1600;
 const plat = { x: 220, y: 270, w: 120, h: 18 };
+const coin = { x: 280, y: 235, r: 8, taken: false };
 const p = { x: 60, y: ground - 24, w: 20, h: 24, speed: 220, vy: 0, grounded: true };
 const keys = {};
+let score = 0;
 
 addEventListener("resize", () => { c.width = innerWidth; c.height = innerHeight; });
 addEventListener("keydown", e => { keys[e.code] = true; });
@@ -47,10 +49,19 @@ function loop() {
     p.grounded = true;
   }
 
+  if (!coin.taken && Math.hypot(p.x + p.w / 2 - coin.x, p.y + p.h / 2 - coin.y) < coin.r + 14) {
+    coin.taken = true;
+    score += 100;
+  }
+
   ctx.fillStyle = "#191a2e"; ctx.fillRect(0, 0, c.width, c.height);
   ctx.fillStyle = "#38b000"; ctx.fillRect(0, ground, c.width, c.height - ground);
   ctx.fillStyle = "#b85d2b"; ctx.fillRect(plat.x, plat.y, plat.w, plat.h);
+  if (!coin.taken) {
+    ctx.fillStyle = "#ffd166"; ctx.beginPath(); ctx.arc(coin.x, coin.y, coin.r, 0, Math.PI * 2); ctx.fill();
+  }
   ctx.fillStyle = "#e03131"; ctx.fillRect(p.x, p.y, p.w, p.h);
+  ctx.fillStyle = "#fff"; ctx.font = "bold 16px monospace"; ctx.fillText("SCORE " + score, 16, 28);
   requestAnimationFrame(loop);
 }
 loop();

@@ -13,18 +13,30 @@
 <canvas id="c"></canvas>
 <script>
 const c = document.getElementById("c"), ctx = c.getContext("2d");
-const ground = 360, p = { x: 60, y: ground - 24, w: 20, h: 24 };
+const ground = 360, grav = 1600;
+const p = { x: 60, y: ground - 24, w: 20, h: 24, vx: 0, vy: 0, onGround: true };
+const keys = {};
 
 function fit() { c.width = innerWidth; c.height = innerHeight; }
 addEventListener("resize", fit); fit();
+addEventListener("keydown", e => { keys[e.code] = true; });
+addEventListener("keyup", e => { keys[e.code] = false; });
 
-function draw() {
+function step() {
+  const dir = (keys.ArrowRight || keys.KeyD ? 1 : 0) - (keys.ArrowLeft || keys.KeyA ? 1 : 0);
+  p.vx = dir * 220;
+  if ((keys.Space || keys.ArrowUp || keys.KeyW) && p.onGround) { p.vy = -620; p.onGround = false; }
+  p.vy += grav * (1 / 60);
+  p.x = Math.max(0, Math.min(c.width - p.w, p.x + p.vx * (1 / 60)));
+  p.y += p.vy * (1 / 60);
+  if (p.y >= ground - p.h) { p.y = ground - p.h; p.vy = 0; p.onGround = true; }
+
   ctx.fillStyle = "#191a2e"; ctx.fillRect(0, 0, c.width, c.height);
   ctx.fillStyle = "#38b000"; ctx.fillRect(0, ground, c.width, c.height - ground);
   ctx.fillStyle = "#e03131"; ctx.fillRect(p.x, p.y, p.w, p.h);
-  requestAnimationFrame(draw);
+  requestAnimationFrame(step);
 }
-draw();
+requestAnimationFrame(step);
 </script>
 </body>
 </html>

@@ -15,6 +15,7 @@ const c = document.getElementById("c"), ctx = c.getContext("2d");
 const ground = 360, grav = 1600;
 const plat = { x: 220, y: 270, w: 120, h: 18 };
 const coin = { x: 280, y: 235, r: 8, taken: false };
+const enemy = { x: 420, y: ground - 24, w: 22, h: 24, vx: -70, minX: 360, maxX: 540, alive: true };
 const p = { x: 60, y: ground - 24, w: 20, h: 24, speed: 220, vy: 0, grounded: true };
 const keys = {};
 let score = 0;
@@ -23,6 +24,10 @@ addEventListener("resize", () => { c.width = innerWidth; c.height = innerHeight;
 addEventListener("keydown", e => { keys[e.code] = true; });
 addEventListener("keyup", e => { keys[e.code] = false; });
 c.width = innerWidth; c.height = innerHeight;
+
+function resetPlayer() {
+  p.x = 60; p.y = ground - p.h; p.vy = 0; p.grounded = true;
+}
 
 function loop() {
   const dt = 1 / 60;
@@ -54,11 +59,30 @@ function loop() {
     score += 100;
   }
 
+  if (enemy.alive) {
+    enemy.x += enemy.vx * dt;
+    if (enemy.x < enemy.minX) { enemy.x = enemy.minX; enemy.vx = Math.abs(enemy.vx); }
+    if (enemy.x + enemy.w > enemy.maxX) { enemy.x = enemy.maxX - enemy.w; enemy.vx = -Math.abs(enemy.vx); }
+
+    if (p.x + p.w > enemy.x && p.x < enemy.x + enemy.w && p.y + p.h > enemy.y && p.y < enemy.y + enemy.h) {
+      if (p.vy > 0 && prevY + p.h <= enemy.y + 10) {
+        enemy.alive = false;
+        p.vy = -460;
+        score += 200;
+      } else {
+        resetPlayer();
+      }
+    }
+  }
+
   ctx.fillStyle = "#191a2e"; ctx.fillRect(0, 0, c.width, c.height);
   ctx.fillStyle = "#38b000"; ctx.fillRect(0, ground, c.width, c.height - ground);
   ctx.fillStyle = "#b85d2b"; ctx.fillRect(plat.x, plat.y, plat.w, plat.h);
   if (!coin.taken) {
     ctx.fillStyle = "#ffd166"; ctx.beginPath(); ctx.arc(coin.x, coin.y, coin.r, 0, Math.PI * 2); ctx.fill();
+  }
+  if (enemy.alive) {
+    ctx.fillStyle = "#9e2a2b"; ctx.fillRect(enemy.x, enemy.y, enemy.w, enemy.h);
   }
   ctx.fillStyle = "#e03131"; ctx.fillRect(p.x, p.y, p.w, p.h);
   ctx.fillStyle = "#fff"; ctx.font = "bold 16px monospace"; ctx.fillText("SCORE " + score, 16, 28);

@@ -6,8 +6,8 @@
 <title>Zephrys</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { width: 100%; height: 100%; overflow: hidden; background: #191a2e; }
-  canvas { display: block; width: 100%; height: 100%; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #191a2e; font-family: monospace; }
+  canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
 </style>
 </head>
 <body>
@@ -18,11 +18,43 @@
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
+let viewW = 800;
+let viewH = 450;
+const groundY = 360;
+const player = { x: 80, y: groundY - 28, w: 22, h: 28 };
+
+function resize() {
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  viewH = 450;
+  viewW = Math.max(360, Math.round(viewH * (window.innerWidth / Math.max(1, window.innerHeight))));
+  canvas.width = Math.round(viewW * dpr);
+  canvas.height = Math.round(viewH * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.imageSmoothingEnabled = false;
+}
+addEventListener("resize", resize);
+resize();
+
+function update(dt) {}
+
 function render() {
   ctx.fillStyle = "#191a2e";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillRect(0, 0, viewW, viewH);
+  ctx.fillStyle = "#38b000";
+  ctx.fillRect(0, groundY, viewW, viewH - groundY);
+  ctx.fillStyle = "#e03131";
+  ctx.fillRect(player.x, player.y, player.w, player.h);
 }
-render();
+
+let last = 0;
+function loop(ts) {
+  const dt = Math.min(0.033, (ts - last) / 1000 || 0);
+  last = ts;
+  update(dt);
+  render();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
 </script>
 </body>
 </html>

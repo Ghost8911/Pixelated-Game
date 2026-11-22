@@ -1,19 +1,23 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8">
+<html lang="en">
+<head>
+<meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>pixelated-game</title>
 <style>
 html,body{margin:0;height:100%;background:#0b0a10;overflow:hidden}
 body{display:flex;align-items:center;justify-content:center}
 canvas{width:min(100vw,calc(100vh*25/14));height:auto;aspect-ratio:25/14;background:#000;cursor:crosshair}
-</style></head><body><canvas id="c" width="800" height="448"></canvas>
+</style>
+</head>
+<body>
+<canvas id="c" width="800" height="448"></canvas>
 <script>
 "use strict";
 const cv=document.getElementById("c"),g=cv.getContext("2d");
 const T=32,COLS=25,ROWS=14,W=800,H=448;
 const CFG={speed:190,grav:1800,jump:600,coyote:.1,buf:.1,reach:3.6,pushT:.25,crateFall:.08,player:{w:22,h:44}};
 
-/* B bedrock, # stone, * ore stone, . air, @ start, E exit, k key, D locked door, G gate, P plate, L lever, C crate */
 const row=(...p)=>p.join("");
 const BED="B".repeat(25);
 const dots=n=>".".repeat(n);
@@ -58,7 +62,6 @@ const LV=[
  BED,BED]}
 ];
 
-/* ---------- state ---------- */
 let state="title",lvl=0,t=0,runT=0,shake=0,muted=false,mouse={x:0,y:0};
 let grid,crates,keysT,plates,levers,P,exitT,inv,torchesCount,placedTorches,bats,creepers,hasKey,timeLeft,pushT=0,coy=0,buf=0,msg="",slot=0;
 let levelTorches=[],swingT=0,crack={x:-1,y:-1,n:0},md=-1,mcd=0;
@@ -66,14 +69,12 @@ const K={l:0,r:0,u:0},SP=[];
 for(let i=0;i<80;i++)SP.push({l:0,x:0,y:0,vx:0,vy:0,c:"#888"});
 const hash=n=>Math.abs(Math.sin(n*127.1)*43758.5)%1;
 
-/* cached light sprite & canvases */
 const dk=document.createElement("canvas");dk.width=W;dk.height=H;const dx=dk.getContext("2d");
 const lightSpr=document.createElement("canvas");lightSpr.width=lightSpr.height=256;
 {const lx=lightSpr.getContext("2d"),lg=lx.createRadialGradient(128,128,8,128,128,128);
 lg.addColorStop(0,"rgba(0,0,0,1)");lg.addColorStop(1,"rgba(0,0,0,0)");
 lx.fillStyle=lg;lx.fillRect(0,0,256,256)}
 
-/* ---------- audio ---------- */
 let ac,nb;
 function audio(){if(!ac)try{ac=new(window.AudioContext||window.webkitAudioContext)()}catch(e){}}
 function tone(f,d,ty,v,sl,delay=0){
@@ -118,7 +119,6 @@ function extras(dt){
  if(state==="play"){dripT-=dt;if(dripT<=0){SFX.drip();dripT=2+Math.random()*4}}
 }
 
-/* ---------- level loading ---------- */
 function cacheTorches(){
  levelTorches=[];
  for(let x=3;x<COLS-2;x+=6){
@@ -170,7 +170,6 @@ function solid(x,y){return state==="out"?y>=sh(x):solidMine(x,y)}
 const occupied=(x,y)=>keysT.some(k=>k.x===x&&k.y===y)||plates.some(p=>p.x===x&&p.y===y)||levers.some(l=>l.x===x&&l.y===y)||placedTorches.some(tr=>tr.x===x&&tr.y===y)||(exitT&&exitT.x===x&&exitT.y===y);
 const bnd=()=>[Math.floor(P.x/T),Math.floor((P.x+P.w-.01)/T),Math.floor(P.y/T),Math.floor((P.y+P.h-.01)/T)];
 
-/* ---------- physics ---------- */
 function moveX(dt){
  P.x+=P.vx*dt;
  const[x0,x1,y0,y1]=bnd();let hitCrate=false;
@@ -309,7 +308,6 @@ function update(dt){
  }
 }
 
-/* ---------- the surface ---------- */
 const SURF={lim:150,home:3};
 const sh=x=>Math.abs(x-SURF.home)<6?9:9+Math.round(Math.sin(x*.11)*1.6+Math.sin(x*.047+2)*2.2);
 let mobs=[],camX=0,outT=0,birdT=3;
@@ -413,7 +411,6 @@ function drawOutAll(){
  if(state==="far")card("You wandered too far",["The world fades and the mine calls you back."],"Press SPACE to start over");
 }
 
-/* ---------- drawing ---------- */
 function drawTile(c,x,y){
  const X=x*T,Y=y*T,h=hash(x*13+y*7);
  if(c==="#"||c==="*"){
@@ -487,7 +484,6 @@ function drawWorld(){
  if(exitT){const e=exitT;g.fillStyle="#ffd166";g.fillRect(e.x*T+4,e.y*T,T-8,T);g.fillStyle="#fff7c0";g.fillRect(e.x*T+8,e.y*T+4,T-16,T-4)}
 }
 
-/* Pixel-art character + Minecraft Pickaxe */
 function drawPlayer(){
  const x=P.x,y=P.y,sw=P.onG&&P.vx?Math.sin(t*18)*4:0,f=P.face;
  g.save();
@@ -585,7 +581,6 @@ function draw(){
  else if(state==="end")card("You escaped!",["Total time: "+runT.toFixed(1)+"s","Morning. The cave mouth opens onto green hills."],"SPACE: step outside   ·   R: play again from room 1");
 }
 
-/* ---------- loop & input ---------- */
 let last=0;
 function frame(ts){
  const dt=Math.min(.033,(ts-last)/1000||0);last=ts;t+=dt;
@@ -629,4 +624,6 @@ addEventListener("mouseup",()=>{md=-1});
 cv.addEventListener("contextmenu",e=>e.preventDefault());
 load(0);state="title";
 requestAnimationFrame(frame);
-</script></body></html>
+</script>
+</body>
+</html>

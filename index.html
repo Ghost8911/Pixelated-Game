@@ -16,42 +16,71 @@ const c = document.getElementById("c"), ctx = c.getContext("2d");
 const ground = 360, grav = 1600;
 const plat = { x: 220, y: 270, w: 120, h: 18 };
 const coin = { x: 270, y: 236, r: 8, taken: false };
+const enemy = { x: 420, y: ground - 24, w: 22, h: 24, vx: -70, minX: 360, maxX: 540, alive: true };
+const goal = { x: 620, y: ground - 40, w: 18, h: 40 };
 const p = { x: 60, y: ground - 24, w: 20, h: 24, vx: 0, vy: 0, onGround: true };
 const keys = {};
-let score = 0;
+let score = 0, won = false;
 
 function fit() { c.width = innerWidth; c.height = innerHeight; }
 addEventListener("resize", fit); fit();
 addEventListener("keydown", e => { keys[e.code] = true; });
 addEventListener("keyup", e => { keys[e.code] = false; });
 
+function resetRun() {
+  p.x = 60; p.y = ground - p.h; p.vx = 0; p.vy = 0; p.onGround = true;
+}
+
 function step() {
   const dt = 1 / 60;
-  const dir = (keys.ArrowRight || keys.KeyD ? 1 : 0) - (keys.ArrowLeft || keys.KeyA ? 1 : 0);
-  p.vx = dir * 220;
-  if ((keys.Space || keys.ArrowUp || keys.KeyW) && p.onGround) { p.vy = -620; p.onGround = false; }
+  if (!won) {
+    const dir = (keys.ArrowRight || keys.KeyD ? 1 : 0) - (keys.ArrowLeft || keys.KeyA ? 1 : 0);
+    p.vx = dir * 220;
+    if ((keys.Space || keys.ArrowUp || keys.KeyW) && p.onGround) { p.vy = -620; p.onGround = false; }
 
-  const prevY = p.y;
-  p.vy += grav * dt;
-  p.x = Math.max(0, Math.min(c.width - p.w, p.x + p.vx * dt));
-  p.y += p.vy * dt;
-  p.onGround = false;
+    const prevY = p.y;
+    p.vy += grav * dt;
+    p.x = Math.max(0, Math.min(c.width - p.w, p.x + p.vx * dt));
+    p.y += p.vy * dt;
+    p.onGround = false;
 
-  if (p.y >= ground - p.h) { p.y = ground - p.h; p.vy = 0; p.onGround = true; }
-  if (p.vy >= 0 && prevY + p.h <= plat.y && p.y + p.h >= plat.y && p.x + p.w > plat.x && p.x < plat.x + plat.w) {
-    p.y = plat.y - p.h; p.vy = 0; p.onGround = true;
-  }
+    if (p.y >= ground - p.h) { p.y = ground - p.h; p.vy = 0; p.onGround = true; }
+    if (p.vy >= 0 && prevY + p.h <= plat.y && p.y + p.h >= plat.y && p.x + p.w > plat.x && p.x < plat.x + plat.w) {
+      p.y = plat.y - p.h; p.vy = 0; p.onGround = true;
+    }
 
-  if (!coin.taken && Math.hypot(p.x + p.w / 2 - coin.x, p.y + p.h / 2 - coin.y) < coin.r + 14) {
-    coin.taken = true; score += 100;
+    if (!coin.taken && Math.hypot(p.x + p.w / 2 - coin.x, p.y + p.h / 2 - coin.y) < coin.r + 14) {
+      coin.taken = true; score += 100;
+    }
+
+    if (enemy.alive) {
+      enemy.x += enemy.vx * dt;
+      if (enemy.x < enemy.minX) { enemy.x = enemy.minX; enemy.vx = Math.abs(enemy.vx); }
+      if (enemy.x + enemy.w > enemy.maxX) { enemy.x = enemy.maxX - enemy.w; enemy.vx = -Math.abs(enemy.vx); }
+
+      const hitX = p.x + p.w > enemy.x && p.x < enemy.x + enemy.w;
+      const hitY = p.y + p.h > enemy.y && p.y < enemy.y + enemy.h;
+      if (hitX && hitY) {
+        if (p.vy > 0 && prevY + p.h <= enemy.y + 10) {
+          enemy.alive = false; p.vy = -460; score += 200;
+        } else {
+          resetRun();
+        }
+      }
+    }
+
+    if (p.x + p.w > goal.x && p.x < goal.x + goal.w && p.y + p.h > goal.y) won = true;
   }
 
   ctx.fillStyle = "#191a2e"; ctx.fillRect(0, 0, c.width, c.height);
   ctx.fillStyle = "#38b000"; ctx.fillRect(0, ground, c.width, c.height - ground);
   ctx.fillStyle = "#b85d2b"; ctx.fillRect(plat.x, plat.y, plat.w, plat.h);
   if (!coin.taken) { ctx.fillStyle = "#ffd166"; ctx.beginPath(); ctx.arc(coin.x, coin.y, coin.r, 0, Math.PI * 2); ctx.fill(); }
+  ctx.fillStyle = "#f59e0b"; ctx.fillRect(goal.x, goal.y, goal.w, goal.h);
+  if (enemy.alive) { ctx.fillStyle = "#9e2a2b"; ctx.fillRect(enemy.x, enemy.y, enemy.w, enemy.h); }
   ctx.fillStyle = "#e03131"; ctx.fillRect(p.x, p.y, p.w, p.h);
-  ctx.fillStyle = "#fff"; ctx.font = "bold 16px monospace"; ctx.fillText("SCORE " + score, 16, 28);
+  ctx.fillStyle = "#fff"; ctx.font = "bold 16px monospace";
+  ctx.fillText("SCORE " + score + (won ? "  |  GOAL REACHED!" : ""), 16, 28);
   requestAnimationFrame(step);
 }
 requestAnimationFrame(step);

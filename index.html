@@ -2,16 +2,23 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>Zephrys</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { width: 100%; height: 100%; overflow: hidden; background: #191a2e; font-family: monospace; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #191a2e; font-family: monospace; user-select: none; }
   canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+  .pad { position: fixed; bottom: 14px; display: none; gap: 10px; z-index: 10; }
+  .pad-l { left: 14px; }
+  .pad-r { right: 14px; }
+  button.ctrl { width: 52px; height: 52px; border-radius: 8px; border: 2px solid #94a3b8; background: rgba(25,26,46,0.75); color: #fff; font: bold 14px monospace; touch-action: none; }
+  @media (pointer: coarse), (max-width: 700px) { .pad { display: flex; } }
 </style>
 </head>
 <body>
 <canvas id="game"></canvas>
+<div class="pad pad-l"><button class="ctrl" id="bL">&lt;</button><button class="ctrl" id="bR">&gt;</button></div>
+<div class="pad pad-r"><button class="ctrl" id="bD">DSH</button><button class="ctrl" id="bJ">JMP</button></div>
 <script>
 "use strict";
 
@@ -26,14 +33,19 @@ const gravity = 1750;
 let viewW = 800;
 let viewH = 450;
 let camX = 0;
+let score = 0;
+let coins = 0;
 let won = false;
+let quit = false;
 let coyote = 0;
 let jumpBuf = 0;
 let dashTimer = 0;
 let dashCD = 0;
 let muted = false;
 let audioCtx = null;
+
 const player = { x: 64, y: 8 * TILE, w: 22, h: 28, vx: 0, vy: 0, grounded: false, dir: 1 };
+const enemy = { x: 10 * TILE, y: 12 * TILE - 26, w: 24, h: 26, vx: -65, alive: true };
 const keys = { left: false, right: false };
 
 const grid = Array.from({ length: ROWS }, (_, r) =>
@@ -43,6 +55,9 @@ grid[12][13] = "."; grid[13][13] = ".";
 grid[12][14] = "."; grid[13][14] = ".";
 for (const x of [17, 18, 19]) grid[9][x] = "#";
 grid[11][25] = "=";
+
+const coinList = [{ x: 7, y: 10, taken: false }, { x: 18, y: 7, taken: false }];
+const spikes = [{ x: 21, y: 11 }];
 
 function solid(tx, ty) {
   if (tx < 0 || tx >= COLS) return true;
@@ -56,7 +71,7 @@ function respawn() {
 }
 
 function sfx(freq, dur, type = "square", vol = 0.05) {
-  if (muted) return;
+  if (muted || quit) return;
   if (!audioCtx) {
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
@@ -68,6 +83,12 @@ function sfx(freq, dur, type = "square", vol = 0.05) {
   gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + dur);
   osc.connect(gain); gain.connect(audioCtx.destination);
   osc.start(); osc.stop(audioCtx.currentTime + dur);
+}
+
+function triggerDash() {
+  if (won || quit || dashCD > 0 || dashTimer > 0) return;
+  dashTimer = 0.14; dashCD = 0.62; player.vy = 0;
+  sfx(480, 0.08, "triangle", 0.05);
 }
 
 function resize() {
@@ -82,16 +103,30 @@ function resize() {
 addEventListener("resize", resize);
 resize();
 
+function bindBtn(id, down, up) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener("pointerdown", e => { e.preventDefault(); down(); });
+  el.addEventListener("pointerup", e => { e.preventDefault(); up(); });
+  el.addEventListener("pointercancel", up); el.addEventListener("pointerleave", up);
+}
+bindBtn("bL", () => (keys.left = true), () => (keys.left = false));
+bindBtn("bR", () => (keys.right = true), () => (keys.right = false));
+bindBtn("bJ", () => { jumpBuf = 0.12; }, () => {});
+bindBtn("bD", triggerDash, () => {});
+
 addEventListener("keydown", e => {
   if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.code)) e.preventDefault();
   if (e.code === "ArrowLeft" || e.code === "KeyA") keys.left = true;
   if (e.code === "ArrowRight" || e.code === "KeyD") keys.right = true;
   if (e.code === "Space" || e.code === "ArrowUp" || e.code === "KeyW") jumpBuf = 0.12;
-  if ((e.code === "ShiftLeft" || e.code === "ShiftRight" || e.code === "KeyK") && dashCD <= 0 && dashTimer <= 0) {
-    dashTimer = 0.14; dashCD = 0.62; player.vy = 0; sfx(480, 0.08, "triangle", 0.05);
-  }
+  if (e.code === "ShiftLeft" || e.code === "ShiftRight" || e.code === "KeyK") triggerDash();
   if (e.code === "KeyM") muted = !muted;
-  if (e.code === "KeyR") { won = false; respawn(); }
+  if (e.code === "KeyQ") quit = !quit;
+  if (e.code === "KeyR") {
+    won = false; quit = false; score = 0; coins = 0; enemy.alive = true; enemy.x = 10 * TILE; enemy.vx = -65;
+    coinList.forEach(c => (c.taken = false)); respawn();
+  }
 });
 addEventListener("keyup", e => {
   if (e.code === "ArrowLeft" || e.code === "KeyA") keys.left = false;
@@ -99,7 +134,7 @@ addEventListener("keyup", e => {
 });
 
 function update(dt) {
-  if (won) return;
+  if (won || quit) return;
   const move = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
   if (move && dashTimer <= 0) player.dir = move;
 
@@ -128,6 +163,7 @@ function update(dt) {
     }
   }
 
+  const prevVy = player.vy;
   player.y += player.vy * dt;
   player.grounded = false;
   for (let ty = Math.floor(player.y / TILE); ty <= Math.floor((player.y + player.h - 0.01) / TILE); ty++) {
@@ -141,9 +177,34 @@ function update(dt) {
   if (player.y > ROWS * TILE + 20) { sfx(140, 0.22, "sawtooth", 0.06); respawn(); }
   camX = Math.max(0, Math.min(COLS * TILE - viewW, player.x - viewW * 0.35));
 
+  if (enemy.alive) {
+    enemy.x += enemy.vx * dt;
+    const ax = Math.floor((enemy.x + (enemy.vx > 0 ? enemy.w : 0)) / TILE);
+    const fy = Math.floor((enemy.y + enemy.h + 4) / TILE);
+    if (solid(ax, 11) || !solid(ax, fy)) enemy.vx *= -1;
+    if (player.x < enemy.x + enemy.w && player.x + player.w > enemy.x && player.y < enemy.y + enemy.h && player.y + player.h > enemy.y) {
+      if (prevVy > 0 && player.y + player.h - prevVy * dt <= enemy.y + 12) {
+        enemy.alive = false; player.vy = -490; score += 200; sfx(460, 0.1, "square", 0.06);
+      } else {
+        sfx(140, 0.22, "sawtooth", 0.06); respawn();
+      }
+    }
+  }
+
+  for (const c of coinList) {
+    if (!c.taken && Math.abs(player.x + player.w / 2 - (c.x * TILE + 16)) < 20 && Math.abs(player.y + player.h / 2 - (c.y * TILE + 16)) < 20) {
+      c.taken = true; coins++; score += 100; sfx(1180, 0.09, "square", 0.05);
+    }
+  }
+  for (const s of spikes) {
+    if (player.x < s.x * TILE + 24 && player.x + player.w > s.x * TILE + 8 && player.y + player.h > s.y * TILE + 12) {
+      sfx(140, 0.22, "sawtooth", 0.06); respawn();
+    }
+  }
+
   const gx = Math.floor((player.x + player.w / 2) / TILE);
   const gy = Math.floor((player.y + player.h + 2) / TILE);
-  if (grid[gy] && grid[gy][gx] === "=") {
+  if (grid[gy] && grid[gy][gx] === "=" && !won) {
     won = true; sfx(784, 0.22, "triangle", 0.07);
   }
 }
@@ -162,13 +223,21 @@ function render() {
       else if (ch === "=") { ctx.fillStyle = "#f59e0b"; ctx.fillRect(x * TILE, y * TILE, TILE, TILE); }
     }
   }
+  for (const c of coinList) if (!c.taken) { ctx.fillStyle = "#ffd166"; ctx.fillRect(c.x * TILE + 10, c.y * TILE + 10, 12, 12); }
+  for (const s of spikes) { ctx.fillStyle = "#cbd5e1"; ctx.fillRect(s.x * TILE + 8, s.y * TILE + 14, 16, 18); }
+  if (enemy.alive) { ctx.fillStyle = "#9e2a2b"; ctx.fillRect(enemy.x, enemy.y, enemy.w, enemy.h); }
   ctx.fillStyle = dashTimer > 0 ? "#ffd166" : "#e03131";
   ctx.fillRect(player.x, player.y, player.w, player.h);
   ctx.restore();
 
   ctx.fillStyle = "#fff";
   ctx.font = "bold 13px monospace";
-  ctx.fillText(`[M] SFX:${muted ? "OFF" : "ON"}  [R] RESET${won ? "  |  STAGE CLEAR!" : ""}`, 14, 24);
+  ctx.fillText(`COINS x${coins}  SCORE ${score}  [M] SFX:${muted ? "OFF" : "ON"}  [Q] QUIT  [R] RESET${won ? "  |  STAGE CLEAR!" : ""}`, 14, 24);
+  if (quit) {
+    ctx.fillStyle = "#ff6b6b";
+    ctx.font = "bold 20px monospace";
+    ctx.fillText("QUIT — Press Q to resume", 14, 62);
+  }
 }
 
 let last = 0;

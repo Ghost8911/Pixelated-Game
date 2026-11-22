@@ -199,7 +199,6 @@ function crackDraw(){
 function placeStone(tx,ty){
  if(grid[ty][tx]==="."&&inv>0&&!crateAt(tx,ty)&&!occupied(tx,ty)){
   const ov=P.x<(tx+1)*T&&P.x+P.w>tx*T&&P.y<(ty+1)*T&&P.y+P.h>ty*T;
-  if!ov[tx]="#";inv--;SFX.place()}
+  if(!ov){grid[ty][tx]="#";inv--;SFX.place()}
  }
-}
 }

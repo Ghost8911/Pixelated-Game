@@ -32,6 +32,7 @@ let won = false;
 let camX = 0;
 let dashTimer = 0;
 let dashCooldown = 0;
+let walkTime = 0;
 
 function resizeCanvas() {
   const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -258,9 +259,66 @@ function update(dt) {
   updateStageItems();
 }
 
+function drawPlayer() {
+  const moving = Math.abs(player.vx) > 10 && player.onGround;
+  if (moving) walkTime += 0.22;
+  else walkTime = 0;
+  const step = moving ? Math.sin(walkTime) * 3 : 0;
+
+  ctx.save();
+  ctx.translate(player.x + player.w / 2, player.y);
+  ctx.scale(player.facing, 1);
+
+  ctx.fillStyle = dashTimer > 0 ? "#ffd166" : "#e03131";
+  ctx.fillRect(-2, 0, 10, 5);
+  ctx.fillStyle = "#cbd5e1";
+  ctx.fillRect(-8, 4, 16, 10);
+  ctx.fillStyle = "#181824";
+  ctx.fillRect(0, 7, 8, 3);
+  ctx.fillStyle = "#2b8a3e";
+  ctx.fillRect(-8, 14, 16, 8);
+  ctx.fillStyle = "#221b28";
+  ctx.fillRect(-7, 22 + step, 6, 6);
+  ctx.fillRect(1, 22 - step, 6, 6);
+
+  ctx.restore();
+}
+
+function drawEnemy() {
+  if (!enemy.alive) return;
+  const bob = Math.sin(performance.now() * 0.012) * 2;
+  ctx.save();
+  ctx.translate(enemy.x, enemy.y);
+
+  ctx.fillStyle = "#f8fafc";
+  ctx.fillRect(3, 0, 4, 4);
+  ctx.fillRect(enemy.w - 7, 0, 4, 4);
+  ctx.fillStyle = "#9e2a2b";
+  ctx.fillRect(0, 3, enemy.w, enemy.h - 7);
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(4, 8, 5, 5);
+  ctx.fillRect(enemy.w - 9, 8, 5, 5);
+  ctx.fillStyle = "#181824";
+  ctx.fillRect(enemy.vx < 0 ? 4 : 6, 10, 2, 2);
+  ctx.fillRect(enemy.vx < 0 ? enemy.w - 9 : enemy.w - 7, 10, 2, 2);
+  ctx.fillStyle = "#450a0a";
+  ctx.fillRect(3, enemy.h - 4 + bob, 6, 4);
+  ctx.fillRect(enemy.w - 9, enemy.h - 4 - bob, 6, 4);
+
+  ctx.restore();
+}
+
 function render() {
   ctx.fillStyle = STAGES[stageIdx].sky;
   ctx.fillRect(0, 0, viewW, viewH);
+
+  ctx.fillStyle = "rgba(0, 0, 0, 0.22)";
+  for (let hx = -200; hx < viewW + 200; hx += 220) {
+    const px = hx - (camX * 0.25) % 220;
+    ctx.beginPath();
+    ctx.arc(px + 90, viewH - 70, 110, Math.PI, 0);
+    ctx.fill();
+  }
 
   ctx.save();
   ctx.translate(-camX, viewH - ROWS * TILE);
@@ -275,19 +333,28 @@ function render() {
       } else if (ch === "#") {
         ctx.fillStyle = "#b85d2b";
         ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
+        ctx.strokeStyle = "#6e3212";
+        ctx.strokeRect(x * TILE + 1, y * TILE + 1, TILE - 2, TILE - 2);
       } else if (ch === "=") {
         ctx.fillStyle = "#f59e0b";
         ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
+        ctx.fillStyle = "#e2e8f0";
+        ctx.fillRect(x * TILE + 14, y * TILE - 32, 4, 32);
+        ctx.fillStyle = "#ef4444";
+        ctx.fillRect(x * TILE + 18, y * TILE - 30, 14, 10);
       }
     }
   }
 
+  const coinBob = Math.sin(performance.now() * 0.008) * 3;
   for (const c of coinList) {
     if (c.taken) continue;
     ctx.fillStyle = "#ffd166";
     ctx.beginPath();
-    ctx.arc(c.x * TILE + 16, c.y * TILE + 16, 8, 0, Math.PI * 2);
+    ctx.arc(c.x * TILE + 16, c.y * TILE + 16 + coinBob, 8, 0, Math.PI * 2);
     ctx.fill();
+    ctx.fillStyle = "#fff3b0";
+    ctx.fillRect(c.x * TILE + 14, c.y * TILE + 11 + coinBob, 2, 6);
   }
 
   for (const s of spikes) {
@@ -299,13 +366,8 @@ function render() {
     ctx.fill();
   }
 
-  if (enemy.alive) {
-    ctx.fillStyle = "#9e2a2b";
-    ctx.fillRect(enemy.x, enemy.y, enemy.w, enemy.h);
-  }
-
-  ctx.fillStyle = dashTimer > 0 ? "#ffd166" : "#e03131";
-  ctx.fillRect(player.x, player.y, player.w, player.h);
+  drawEnemy();
+  drawPlayer();
   ctx.restore();
 
   ctx.fillStyle = "#fff";

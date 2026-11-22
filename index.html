@@ -33,6 +33,27 @@ let camX = 0;
 let dashTimer = 0;
 let dashCooldown = 0;
 let walkTime = 0;
+let muted = false;
+let audioCtx = null;
+
+function sfx(freq, dur, type = "square", vol = 0.05) {
+  if (muted) return;
+  if (!audioCtx) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    audioCtx = new AC();
+  }
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+  gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + dur);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + dur);
+}
 
 function resizeCanvas() {
   const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -372,7 +393,7 @@ function render() {
 
   ctx.fillStyle = "#fff";
   ctx.font = "bold 14px monospace";
-  ctx.fillText(`${STAGES[stageIdx].name} | LIVES x${lives}  COINS x${coins}  SCORE ${score}`, 14, 24);
+  ctx.fillText(`${STAGES[stageIdx].name} | LIVES x${lives}  COINS x${coins}  SCORE ${score}  [M] SFX:${muted ? "OFF" : "ON"}`, 14, 24);
   if (won) {
     ctx.fillStyle = "#ffd166";
     ctx.font = "bold 22px monospace";
@@ -393,6 +414,7 @@ window.addEventListener("keydown", e => {
     dashCooldown = 0.62;
     player.vy = 0;
   }
+  if (e.code === "KeyM") muted = !muted;
   if ((e.code === "KeyN" || e.code === "Enter") && won) {
     loadStage(stageIdx + 1);
   }

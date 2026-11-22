@@ -21,7 +21,9 @@ const ctx = canvas.getContext("2d");
 let viewW = 800;
 let viewH = 450;
 const groundY = 360;
-const player = { x: 80, y: groundY - 28, w: 22, h: 28 };
+const gravity = 1750;
+const player = { x: 80, y: groundY - 28, w: 22, h: 28, vx: 0, vy: 0, grounded: true };
+const keys = { left: false, right: false };
 
 function resize() {
   const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -35,7 +37,34 @@ function resize() {
 addEventListener("resize", resize);
 resize();
 
-function update(dt) {}
+addEventListener("keydown", e => {
+  if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.code)) e.preventDefault();
+  if (e.code === "ArrowLeft" || e.code === "KeyA") keys.left = true;
+  if (e.code === "ArrowRight" || e.code === "KeyD") keys.right = true;
+  if ((e.code === "Space" || e.code === "ArrowUp" || e.code === "KeyW") && player.grounded) {
+    player.vy = -680;
+    player.grounded = false;
+  }
+});
+addEventListener("keyup", e => {
+  if (e.code === "ArrowLeft" || e.code === "KeyA") keys.left = false;
+  if (e.code === "ArrowRight" || e.code === "KeyD") keys.right = false;
+});
+
+function update(dt) {
+  const move = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
+  player.vx = move * 225;
+  player.vy = Math.min(920, player.vy + gravity * dt);
+
+  player.x = Math.max(0, Math.min(viewW - player.w, player.x + player.vx * dt));
+  player.y += player.vy * dt;
+
+  if (player.y >= groundY - player.h) {
+    player.y = groundY - player.h;
+    player.vy = 0;
+    player.grounded = true;
+  }
+}
 
 function render() {
   ctx.fillStyle = "#191a2e";

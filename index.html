@@ -12,15 +12,59 @@
     overflow: hidden; touch-action: none; font-family: "Courier New", monospace;
   }
   canvas { display: block; width: 100vw; height: 100dvh; image-rendering: pixelated; }
+  #hudBtns {
+    position: fixed; top: 10px; right: 12px; z-index: 12;
+    display: flex; gap: 6px; flex-wrap: wrap;
+  }
+  .btn {
+    background: rgba(22, 24, 40, 0.8); color: #eef2ff;
+    border: 1.5px solid rgba(255, 255, 255, 0.25);
+    border-radius: 8px; padding: 6px 10px; font: 700 11px system-ui, sans-serif; cursor: pointer;
+  }
+  .btn.gold { color: #ffd166; border-color: rgba(255, 209, 102, 0.6); }
+  .btn.red { color: #ffb3b3; border-color: rgba(255, 107, 107, 0.6); }
+  #touchPad { position: fixed; inset: 0; pointer-events: none; display: none; z-index: 10; }
+  #touchPad.show { display: block; }
+  .group { position: absolute; bottom: 18px; display: flex; gap: 12px; pointer-events: auto; }
+  .group.left { left: 18px; }
+  .group.right { right: 18px; }
+  .padBtn {
+    width: 62px; height: 62px; border-radius: 14px;
+    background: rgba(24, 26, 44, 0.72); border: 2px solid rgba(255, 255, 255, 0.3);
+    color: #fff; font: 800 18px system-ui, sans-serif;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .padBtn.wide { width: 76px; font-size: 13px; }
 </style>
 </head>
 <body>
 <canvas id="game"></canvas>
+
+<div id="hudBtns">
+  <button class="btn gold" id="heroBtn">HERO</button>
+  <button class="btn" id="padBtn">PAD</button>
+  <button class="btn" id="muteBtn">SFX: ON</button>
+  <button class="btn" id="fullBtn">FULL</button>
+  <button class="btn red" id="quitBtn">QUIT</button>
+</div>
+
+<div id="touchPad">
+  <div class="group left">
+    <div class="padBtn" id="moveLeft">◀</div>
+    <div class="padBtn" id="moveRight">▶</div>
+  </div>
+  <div class="group right">
+    <div class="padBtn wide" id="dashBtn">DASH</div>
+    <div class="padBtn wide" id="jumpBtn">JUMP</div>
+  </div>
+</div>
+
 <script>
 "use strict";
 
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
+const touchPad = document.getElementById("touchPad");
 
 const TILE = 32;
 const ROWS = 14;
@@ -47,45 +91,159 @@ function fitScreen() {
 window.addEventListener("resize", fitScreen);
 fitScreen();
 
-let lives = 3;
+if ("ontouchstart" in window || navigator.maxTouchPoints > 0) {
+  touchPad.classList.add("show");
+}
+
+const HEROES = [
+  { name: "Crimson Knight", role: "Balanced", speed: 225, jump: 695, dash: 510, plume: "#e03131", armor: "#adb5bd", tunic: "#2b8a3e" },
+  { name: "Azure Ranger", role: "High Jump", speed: 242, jump: 735, dash: 530, plume: "#38bdf8", armor: "#cbd5e1", tunic: "#0284c7" },
+  { name: "Emerald Paladin", role: "Strong Dash", speed: 212, jump: 720, dash: 560, plume: "#4ade80", armor: "#94a3b8", tunic: "#15803d" },
+  { name: "Shadow Rogue", role: "Fast & Agile", speed: 252, jump: 690, dash: 600, plume: "#c084fc", armor: "#475569", tunic: "#6b21a8" }
+];
+
+const MAPS = [
+  {
+    name: "1. Moonlit Lake", skyTop: "#2b3154", skyBot: "#4f587d", hill: "#2b2747",
+    rows: [
+      "..............................................................",
+      "..............................................................",
+      "..............................................................",
+      "..............................................................",
+      ".............c.c.c............................................",
+      "............###?###.................?...?.....................",
+      "..............................................................",
+      "................................c.c......................F....",
+      "................................#####....................|....",
+      "........e...................................e............G....",
+      "...?....#........e......###.....###....#................===...",
+      "..####.###......###....#####...#####..###.....G........GGGGGG",
+      "GGGGGGGGGGGG..GGGGGGGGGGGGGGGGGG..GGGGGGGGGGGGGGGGGGGGGGGGGGGG",
+      "GGGGGGGGGGGG..GGGGGGGGGGGGGGGGGG..GGGGGGGGGGGGGGGGGGGGGGGGGGGG"
+    ]
+  },
+  {
+    name: "2. Emerald Plains", skyTop: "#38bdf8", skyBot: "#bae6fd", hill: "#22c55e",
+    rows: [
+      "..............................................................",
+      "..............................................................",
+      "..............................................................",
+      "..................?...?...?...................................",
+      "...................................c.c.c......................",
+      ".........c.c......................#######.....................",
+      "........#####..................................###............",
+      ".........................................................F....",
+      "..................e.....................e................|....",
+      ".....e...........###...................###......?.........G....",
+      "..?.#####.......#####..........###.....#####....###......===...",
+      ".####....#.....................#####..........#####...GGGGGGG",
+      "GGGGGGGGGGG..GGGGGGGGGG..GGGGGGGGGGGGGGGGGG..GGGGGGGGGGGGGGGGG",
+      "GGGGGGGGGGG..GGGGGGGGGG..GGGGGGGGGGGGGGGGGG..GGGGGGGGGGGGGGGGG"
+    ]
+  },
+  {
+    name: "3. Canyon Dusk", skyTop: "#3b2f63", skyBot: "#f97316", hill: "#7c2d12",
+    rows: [
+      "..............................................................",
+      "..............................................................",
+      "................................c..c..c.......................",
+      "...............?...?...........#########......................",
+      "..............................................................",
+      ".......c.c....................................c.c.............",
+      "......#####..................................#####............",
+      ".........................................................F....",
+      "...........e........................e....................|....",
+      "..e.......###......................###........?..........G....",
+      ".###.....###...........###........###.......###.........===...",
+      "G###.....###..........#####.......###...e...###.......GGGGGGG",
+      "GGGGGG..GGGGGG..GGGGGG..GGGGGGGGGG..GGGGGGGGGGGG..GGGGGGGGGGGG",
+      "GGGGGG..GGGGGG..GGGGGG..GGGGGGGGGG..GGGGGGGGGGGG..GGGGGGGGGGGG"
+    ]
+  },
+  {
+    name: "4. Aurora Peaks", skyTop: "#0f172a", skyBot: "#1e3a5f", hill: "#1e293b",
+    rows: [
+      "..............................................................",
+      "..............................................................",
+      ".......................c.c.c..................................",
+      "..........?...?.......#######............?...?................",
+      "..............................................................",
+      "....c.c.......................c.c.............................",
+      ".....#####........###........#####............###.............",
+      ".....................................e...................F....",
+      "...........e........................###..................|....",
+      "..........###....^.^......?......#####........?..........G....",
+      "...###...#####..#####....###.................###........===...",
+      "GGGG###.........#####...#####..e.............#####....GGGGGGG",
+      "GGGGGGG...GGGGG..........GGGGGGGGGG...GGGGG..GGGGGGGGGGGGGGGGG",
+      "GGGGGGG...GGGGG..........GGGGGGGGGG...GGGGG..GGGGGGGGGGGGGGGGG"
+    ]
+  },
+  {
+    name: "5. Crimson Keep", skyTop: "#180814", skyBot: "#7f1d1d", hill: "#450a0a",
+    rows: [
+      "..............................................................",
+      "..............................................................",
+      ".................c..c..c......................................",
+      ".......?...?....#########...........?...?...?.................",
+      "..............................................................",
+      "..............................c.c.............................",
+      "....#####....................#####...............###..........",
+      ".....................................e...................F....",
+      ".......e.................e..........###..................|....",
+      "..e...###................###.......#####....^.^..........G....",
+      ".###.#####......^.^.....#####...............#####.......===...",
+      "G###...........#####..........e........................GGGGGGG",
+      "GGGGGG..GGGGGGG..GGGGGG..GGGGGGGGGG..GGGGGGGGGG..GGGGGGGGGGGGG",
+      "GGGGGG..GGGGGGG..GGGGGG..GGGGGGGGGG..GGGGGGGGGG..GGGGGGGGGGGGG"
+    ]
+  }
+];
+
+let screen = "title";
+let mapIndex = 0;
+let heroIndex = 0;
 let score = 0;
 let coins = 0;
+let lives = 3;
+let poweredUp = false;
 let invulnTimer = 0;
 let dashTimer = 0;
 let dashCooldown = 0;
 let coyoteTimer = 0;
 let jumpBuffer = 0;
 let camX = 0;
-let colsCount = 24;
+let endMsg = "";
+let muted = false;
 
-let grid = Array.from({ length: ROWS }, (_, r) =>
-  Array.from({ length: colsCount }, (__, c) => (r >= 12 ? "G" : "."))
-);
+let grid = [];
+let colsCount = 62;
+let items = [];
+let mushrooms = [];
+let enemies = [];
+let spikes = [];
+let flagCol = null;
+let player = null;
 
-let player = {
-  x: 2 * TILE + 6,
-  y: 9 * TILE - 28,
-  w: 22,
-  h: 28,
-  vx: 0,
-  vy: 0,
-  onGround: false,
-  facing: 1
-};
-
-let items = [
-  { x: 6, y: 10, coin: true, taken: false },
-  { x: 8, y: 10, coin: true, taken: false }
-];
-let enemies = [
-  { x: 9 * TILE + 4, y: 12 * TILE - 26, w: 24, h: 26, vx: -60, vy: 0, alive: true }
-];
-let spikes = [
-  { x: 14, y: 11 }
-];
-
-const activeHero = { speed: 225, jump: 695, dash: 510 };
 const keys = { left: false, right: false };
+
+let audioCtx = null;
+function playBeep(freq, dur, type = "square", vol = 0.05) {
+  if (muted) return;
+  if (!audioCtx) {
+    try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (_) { return; }
+  }
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+  gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + dur);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + dur);
+}
 
 function isSolidTile(ch) {
   return ch === "G" || ch === "#" || ch === "?" || ch === "U" || ch === "P" || ch === "p" || ch === "=";
@@ -97,27 +255,112 @@ function solidAt(tx, ty) {
   return isSolidTile(grid[ty][tx]);
 }
 
-function respawnInStage() {
-  invulnTimer = 1.3;
-  player.x = 2 * TILE + 6;
-  player.y = 8 * TILE - player.h;
-  player.vx = 0;
-  player.vy = 0;
-  camX = 0;
+function setPoweredUp(state) {
+  if (poweredUp === state) return;
+  const bottom = player.y + player.h;
+  poweredUp = state;
+  player.h = poweredUp ? 38 : 28;
+  player.y = bottom - player.h;
 }
 
-function hurtPlayer() {
-  if (invulnTimer > 0 || dashTimer > 0) return;
-  lives--;
-  if (lives <= 0) {
-    lives = 3;
-    score = 0;
-    coins = 0;
+function loadMap(idx) {
+  mapIndex = idx;
+  grid = MAPS[idx].rows.map(r => r.split(""));
+  colsCount = grid[0].length;
+  items = [];
+  mushrooms = [];
+  enemies = [];
+  spikes = [];
+  flagCol = null;
+  invulnTimer = 0;
+  dashTimer = 0;
+  dashCooldown = 0;
+  coyoteTimer = 0;
+  jumpBuffer = 0;
+  camX = 0;
+
+  const h = poweredUp ? 38 : 28;
+  player = { x: 2 * TILE + 6, y: 9 * TILE - h, w: 22, h, vx: 0, vy: 0, onGround: false, facing: 1 };
+
+  for (let y = 0; y < ROWS; y++) {
+    for (let x = 0; x < colsCount; x++) {
+      const ch = grid[y][x];
+      if (ch === "?") items.push({ x, y, coin: false, used: false });
+      else if (ch === "c") { items.push({ x, y, coin: true, taken: false }); grid[y][x] = "."; }
+      else if (ch === "e") { enemies.push({ x: x * TILE + 4, y: (y + 1) * TILE - 26, w: 24, h: 26, vx: -58 - idx * 5, vy: 0, alive: true }); grid[y][x] = "."; }
+      else if (ch === "^") { spikes.push({ x, y }); grid[y][x] = "."; }
+      else if (ch === "F") flagCol = x;
+    }
   }
-  respawnInStage();
+}
+
+function startRun(idx) {
+  playBeep(520, 0.09, "triangle", 0.06);
+  score = 0;
+  coins = 0;
+  lives = 3;
+  poweredUp = false;
+  loadMap(idx);
+  screen = "play";
+}
+
+function triggerDash() {
+  if (screen !== "play" || dashCooldown > 0 || dashTimer > 0) return;
+  dashTimer = DASH_DURATION;
+  dashCooldown = DASH_COOLDOWN;
+  player.vy = 0;
+  playBeep(440, 0.08, "triangle", 0.05);
+}
+
+function hurtPlayer(reason) {
+  if (invulnTimer > 0 || dashTimer > 0) return;
+  if (poweredUp) {
+    setPoweredUp(false);
+    invulnTimer = 1.2;
+    playBeep(170, 0.2, "sawtooth", 0.07);
+    return;
+  }
+  lives--;
+  playBeep(130, 0.25, "sawtooth", 0.07);
+  if (lives <= 0) {
+    endMsg = reason || "Out of lives";
+    screen = "over";
+  } else {
+    invulnTimer = 1.3;
+    player.x = 2 * TILE + 6;
+    player.y = 8 * TILE - player.h;
+    player.vx = 0;
+    player.vy = 0;
+    camX = 0;
+  }
+}
+
+function hitBlockAbove(tx, ty) {
+  if (tx < 0 || tx >= colsCount || ty < 0 || ty >= ROWS) return;
+  const ch = grid[ty][tx];
+  if (ch === "?") {
+    const box = items.find(it => !it.coin && it.x === tx && it.y === ty);
+    if (box && !box.used) {
+      box.used = true;
+      grid[ty][tx] = "U";
+      playBeep(780, 0.08, "square", 0.06);
+      if (!poweredUp && (tx + ty) % 2 === 0) {
+        mushrooms.push({ x: tx * TILE + 4, y: (ty - 1) * TILE + 4, w: 24, h: 24, vx: 85, vy: -120, alive: true });
+      } else {
+        coins++;
+        score += 100;
+        playBeep(1180, 0.1, "square", 0.05);
+      }
+    }
+  } else if (ch === "#" && poweredUp) {
+    grid[ty][tx] = ".";
+    score += 50;
+    playBeep(140, 0.12, "sawtooth", 0.06);
+  }
 }
 
 function movePlayer(dt) {
+  const hero = HEROES[heroIndex];
   if (invulnTimer > 0) invulnTimer -= dt;
   if (dashCooldown > 0) dashCooldown -= dt;
 
@@ -126,20 +369,21 @@ function movePlayer(dt) {
 
   if (dashTimer > 0) {
     dashTimer -= dt;
-    player.vx = player.facing * activeHero.dash;
+    player.vx = player.facing * hero.dash;
     player.vy = 0;
   } else {
-    player.vx = moveDir * activeHero.speed;
+    player.vx = moveDir * hero.speed;
     player.vy = Math.min(920, player.vy + GRAVITY * dt);
   }
 
   coyoteTimer = player.onGround ? 0.11 : coyoteTimer - dt;
   jumpBuffer -= dt;
   if (jumpBuffer > 0 && coyoteTimer > 0) {
-    player.vy = -activeHero.jump;
+    player.vy = -hero.jump;
     coyoteTimer = 0;
     jumpBuffer = 0;
     player.onGround = false;
+    playBeep(poweredUp ? 270 : 350, 0.1, "square", 0.05);
   }
 
   player.x += player.vx * dt;
@@ -173,12 +417,13 @@ function movePlayer(dt) {
         } else if (player.vy < 0) {
           player.y = (ty + 1) * TILE;
           player.vy = 0;
+          if (prevVy < 0) hitBlockAbove(tx, ty);
         }
       }
     }
   }
 
-  if (player.y > ROWS * TILE + 20) hurtPlayer();
+  if (player.y > ROWS * TILE + 20) hurtPlayer("Fell into a pit");
   camX = Math.max(0, Math.min(colsCount * TILE - viewW, player.x - viewW * 0.35));
   return prevVy;
 }
@@ -193,6 +438,34 @@ function stepEntities(dt, prevVy) {
       it.taken = true;
       coins++;
       score += 100;
+      playBeep(1180, 0.09, "square", 0.05);
+    }
+  }
+
+  for (const m of mushrooms) {
+    if (!m.alive) continue;
+    m.vy = Math.min(850, m.vy + GRAVITY * dt);
+    m.x += m.vx * dt;
+    const gx = Math.floor((m.x + (m.vx > 0 ? m.w : 0)) / TILE);
+    const gy = Math.floor((m.y + m.h / 2) / TILE);
+    if (solidAt(gx, gy)) {
+      if (m.vx > 0) m.x = gx * TILE - m.w;
+      else m.x = (gx + 1) * TILE;
+      m.vx *= -1;
+    }
+    m.y += m.vy * dt;
+    const fy = Math.floor((m.y + m.h) / TILE);
+    const fx = Math.floor((m.x + m.w / 2) / TILE);
+    if (m.vy > 0 && solidAt(fx, fy)) { m.y = fy * TILE - m.h; m.vy = 0; }
+
+    if (
+      player.x < m.x + m.w && player.x + player.w > m.x &&
+      player.y < m.y + m.h && player.y + player.h > m.y
+    ) {
+      m.alive = false;
+      setPoweredUp(true);
+      score += 500;
+      playBeep(880, 0.14, "triangle", 0.06);
     }
   }
 
@@ -201,7 +474,7 @@ function stepEntities(dt, prevVy) {
       player.x < sp.x * TILE + 26 && player.x + player.w > sp.x * TILE + 6 &&
       player.y < sp.y * TILE + 32 && player.y + player.h > sp.y * TILE + 12
     ) {
-      hurtPlayer();
+      hurtPlayer("Hit spikes");
       return;
     }
   }
@@ -231,57 +504,91 @@ function stepEntities(dt, prevVy) {
         player.vy = -STOMP_BOUNCE;
         player.onGround = false;
         score += 200;
+        playBeep(460, 0.1, "square", 0.06);
       } else {
-        hurtPlayer();
+        hurtPlayer("Hit by enemy");
         return;
       }
     }
   }
-}
 
-window.addEventListener("keydown", e => {
-  if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.code)) e.preventDefault();
-  if (e.code === "ArrowLeft" || e.code === "KeyA") keys.left = true;
-  if (e.code === "ArrowRight" || e.code === "KeyD") keys.right = true;
-  if (e.code === "Space" || e.code === "ArrowUp" || e.code === "KeyW") jumpBuffer = 0.11;
-});
-window.addEventListener("keyup", e => {
-  if (e.code === "ArrowLeft" || e.code === "KeyA") keys.left = false;
-  if (e.code === "ArrowRight" || e.code === "KeyD") keys.right = false;
-  if ((e.code === "Space" || e.code === "ArrowUp" || e.code === "KeyW") && player.vy < 0) {
-    player.vy *= 0.45;
+  const footTileY = Math.floor((player.y + player.h + 2) / TILE);
+  const leftTileX = Math.floor(player.x / TILE);
+  const rightTileX = Math.floor((player.x + player.w - 0.01) / TILE);
+  let reachedGold = false;
+  for (let ty = Math.floor(player.y / TILE); ty <= footTileY; ty++) {
+    for (let tx = leftTileX; tx <= rightTileX; tx++) {
+      if (grid[ty] && grid[ty][tx] === "=") reachedGold = true;
+    }
   }
-});
-
-function updateLoop(dt) {
-  clock += dt;
-  const prevVy = movePlayer(dt);
-  stepEntities(dt, prevVy);
+  const reachedFlag = flagCol !== null && player.x + player.w >= flagCol * TILE + 4 && player.x <= flagCol * TILE + 28;
+  if (reachedGold || reachedFlag) {
+    score += 1000;
+    playBeep(784, 0.18, "triangle", 0.07);
+    screen = mapIndex === MAPS.length - 1 ? "end" : "clear";
+  }
 }
 
-function renderLoop() {
-  ctx.fillStyle = "#191a2e";
+function drawHero(x, y, size, facing, charIdx) {
+  const h = HEROES[charIdx];
+  const s = size / 16;
+  ctx.save();
+  ctx.translate(x + size / 2, y);
+  ctx.scale(facing, 1);
+  const ox = -size / 2;
+  ctx.fillStyle = h.plume; ctx.fillRect(ox + 7 * s, s, 5 * s, 3 * s);
+  ctx.fillStyle = h.armor; ctx.fillRect(ox + 4 * s, 4 * s, 8 * s, 6 * s);
+  ctx.fillStyle = "#181824"; ctx.fillRect(ox + 8 * s, 6 * s, 4 * s, 2 * s);
+  ctx.fillStyle = h.tunic; ctx.fillRect(ox + 4 * s, 10 * s, 8 * s, 4 * s);
+  ctx.fillStyle = "#221b28"; ctx.fillRect(ox + 4 * s, 14 * s, 3 * s, 2 * s); ctx.fillRect(ox + 9 * s, 14 * s, 3 * s, 2 * s);
+  ctx.restore();
+}
+
+function renderPlay() {
+  const m = MAPS[mapIndex];
+  const grad = ctx.createLinearGradient(0, 0, 0, viewH);
+  grad.addColorStop(0, m.skyTop);
+  grad.addColorStop(1, m.skyBot);
+  ctx.fillStyle = grad;
   ctx.fillRect(0, 0, viewW, viewH);
+
+  ctx.fillStyle = m.hill;
+  ctx.fillRect(0, viewH - 110, viewW, 110);
 
   ctx.save();
   ctx.translate(-camX, viewH - ROWS * TILE);
+
+  const c0 = Math.max(0, Math.floor(camX / TILE) - 1);
+  const c1 = Math.min(colsCount, c0 + Math.ceil(viewW / TILE) + 3);
   for (let y = 0; y < ROWS; y++) {
-    for (let x = 0; x < colsCount; x++) {
-      if (grid[y][x] === "G") {
-        ctx.fillStyle = "#8b542b";
-        ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
-        ctx.fillStyle = "#38b000";
-        ctx.fillRect(x * TILE, y * TILE, TILE, 8);
+    for (let x = c0; x < c1; x++) {
+      const ch = grid[y][x];
+      const px = x * TILE;
+      const py = y * TILE;
+      if (ch === "G") {
+        ctx.fillStyle = "#8b542b"; ctx.fillRect(px, py, TILE, TILE);
+        ctx.fillStyle = "#38b000"; ctx.fillRect(px, py, TILE, 8);
+      } else if (ch === "#") {
+        ctx.fillStyle = "#b85d2b"; ctx.fillRect(px, py, TILE, TILE);
+        ctx.strokeStyle = "#6e3212"; ctx.strokeRect(px + 1, py + 1, TILE - 2, TILE - 2);
+      } else if (ch === "?") {
+        ctx.fillStyle = "#f7b500"; ctx.fillRect(px, py, TILE, TILE);
+        ctx.fillStyle = "#fff"; ctx.font = "bold 18px monospace"; ctx.textAlign = "center";
+        ctx.fillText("?", px + 16, py + 22);
+      } else if (ch === "U") {
+        ctx.fillStyle = "#6c5e53"; ctx.fillRect(px, py, TILE, TILE);
+      } else if (ch === "P" || ch === "p") {
+        ctx.fillStyle = "#2b9348"; ctx.fillRect(px + 2, py, TILE - 4, TILE);
+      } else if (ch === "=") {
+        ctx.fillStyle = "#f59e0b"; ctx.fillRect(px, py, TILE, TILE);
+        ctx.fillStyle = "#fef08a"; ctx.fillRect(px + 2, py + 2, TILE - 4, 5);
+      } else if (ch === "|") {
+        ctx.fillStyle = "#e2e8f0"; ctx.fillRect(px + 14, py, 4, TILE);
+      } else if (ch === "F") {
+        ctx.fillStyle = "#e2e8f0"; ctx.fillRect(px + 14, py, 4, TILE);
+        ctx.fillStyle = "#ef4444"; ctx.fillRect(px + 18, py + 6, 22, 14);
       }
     }
-  }
-
-  for (const it of items) {
-    if (!it.coin || it.taken) continue;
-    ctx.fillStyle = "#ffd166";
-    ctx.beginPath();
-    ctx.arc(it.x * TILE + 16, it.y * TILE + 16, 8, 0, Math.PI * 2);
-    ctx.fill();
   }
 
   for (const sp of spikes) {
@@ -293,22 +600,191 @@ function renderLoop() {
     ctx.fill();
   }
 
-  for (const e of enemies) {
-    if (!e.alive) continue;
-    ctx.fillStyle = "#9e2a2b";
-    ctx.fillRect(e.x, e.y + 2, e.w, e.h - 4);
-    ctx.fillStyle = "#fff";
-    ctx.fillRect(e.x + 5, e.y + 8, 4, 4);
-    ctx.fillRect(e.x + 15, e.y + 8, 4, 4);
+  for (const it of items) {
+    if (!it.coin || it.taken) continue;
+    ctx.fillStyle = "#ffd166";
+    ctx.beginPath();
+    ctx.arc(it.x * TILE + 16, it.y * TILE + 16, 8, 0, Math.PI * 2);
+    ctx.fill();
   }
 
-  ctx.fillStyle = "#e03131";
-  ctx.fillRect(player.x, player.y, player.w, player.h);
+  for (const m of mushrooms) {
+    if (!m.alive) continue;
+    ctx.fillStyle = "#ef4444"; ctx.fillRect(m.x + 2, m.y + 2, 20, 12);
+    ctx.fillStyle = "#f8fafc"; ctx.fillRect(m.x + 6, m.y + 14, 12, 10);
+  }
+
+  for (const e of enemies) {
+    if (!e.alive) continue;
+    ctx.fillStyle = "#9e2a2b"; ctx.fillRect(e.x, e.y + 2, e.w, e.h - 4);
+    ctx.fillStyle = "#fff"; ctx.fillRect(e.x + 5, e.y + 8, 4, 4); ctx.fillRect(e.x + 15, e.y + 8, 4, 4);
+  }
+
+  if (player && (invulnTimer <= 0 || Math.floor(clock * 20) % 2 === 0)) {
+    const drawSize = poweredUp ? 38 : 30;
+    drawHero(player.x - (drawSize - player.w) / 2, player.y - (drawSize - player.h), drawSize, player.facing, heroIndex);
+  }
+
   ctx.restore();
 
+  ctx.textAlign = "left";
   ctx.fillStyle = "#fff";
   ctx.font = "bold 14px monospace";
-  ctx.fillText(`LIVES x${lives}  COINS x${coins}  SCORE ${score}`, 14, 24);
+  ctx.fillText(`${m.name} · ${HEROES[heroIndex].name}`, 14, 24);
+  ctx.fillStyle = "#ffd166";
+  ctx.fillText(`COINS x${coins}  LIVES x${lives}  SCORE ${score}`, 14, 44);
+}
+
+function drawMenu(title, subtitle, options) {
+  ctx.fillStyle = "#191a2e";
+  ctx.fillRect(0, 0, viewW, viewH);
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#ffd166";
+  ctx.font = "bold 28px monospace";
+  ctx.fillText(title, viewW / 2, 64);
+  ctx.fillStyle = "#cbd5e1";
+  ctx.font = "13px system-ui, sans-serif";
+  ctx.fillText(subtitle, viewW / 2, 90);
+
+  options.forEach((opt, i) => {
+    const y = 126 + i * 44;
+    const w = Math.min(340, viewW - 48);
+    const x = (viewW - w) / 2;
+    ctx.fillStyle = "#262b4a";
+    ctx.fillRect(x, y, w, 34);
+    ctx.strokeStyle = "#ffd166";
+    ctx.strokeRect(x, y, w, 34);
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 13px monospace";
+    ctx.fillText(opt, viewW / 2, y + 22);
+  });
+}
+
+function renderLoop() {
+  if (screen === "title") {
+    drawMenu("ZEPHRYS", `Hero: ${HEROES[heroIndex].name}`, ["Start Game", "Select Hero", "Quit"]);
+  } else if (screen === "heroes") {
+    drawMenu("SELECT HERO", "Tap a hero to pick", HEROES.map((h, i) => `${i === heroIndex ? "★ " : ""}${h.name} (${h.role})`).concat("Back"));
+  } else if (screen === "maps") {
+    drawMenu("SELECT MAP", "Tap a map to launch", MAPS.map(m => m.name).concat("Back"));
+  } else if (screen === "play") {
+    renderPlay();
+  } else if (screen === "clear") {
+    drawMenu("STAGE CLEAR", `Score: ${score} · Coins: ${coins}`, ["Next Map", "Map Select"]);
+  } else if (screen === "over") {
+    drawMenu(endMsg || "GAME OVER", `Score: ${score} · Coins: ${coins}`, ["Retry Map", "Map Select"]);
+  } else if (screen === "end") {
+    drawMenu("ALL MAPS CLEARED", `Final Score: ${score}`, ["Map Select", "Title"]);
+  } else if (screen === "quit") {
+    drawMenu("BYE", "Thanks for playing Zephrys", ["Back to Title"]);
+  }
+}
+
+function onMenuClick(py) {
+  if (screen === "title") {
+    if (py >= 126 && py <= 160) screen = "maps";
+    else if (py >= 170 && py <= 204) screen = "heroes";
+    else if (py >= 214 && py <= 248) screen = "quit";
+  } else if (screen === "heroes") {
+    for (let i = 0; i < HEROES.length; i++) {
+      const top = 126 + i * 44;
+      if (py >= top && py <= top + 34) { heroIndex = i; return; }
+    }
+    if (py >= 126 + HEROES.length * 44) screen = "title";
+  } else if (screen === "maps") {
+    for (let i = 0; i < MAPS.length; i++) {
+      const top = 126 + i * 44;
+      if (py >= top && py <= top + 34) { startRun(i); return; }
+    }
+    if (py >= 126 + MAPS.length * 44) screen = "title";
+  } else if (screen === "clear") {
+    if (py <= 160) startRun((mapIndex + 1) % MAPS.length);
+    else screen = "maps";
+  } else if (screen === "over") {
+    if (py <= 160) startRun(mapIndex);
+    else screen = "maps";
+  } else if (screen === "end") {
+    if (py <= 160) screen = "maps";
+    else screen = "title";
+  } else if (screen === "quit") {
+    screen = "title";
+  }
+}
+
+function getPointerY(e) {
+  const rect = canvas.getBoundingClientRect();
+  const clientY = e.touches && e.touches[0] ? e.touches[0].clientY : e.clientY;
+  return ((clientY - rect.top) / Math.max(1, rect.height)) * viewH;
+}
+
+canvas.addEventListener("mousedown", e => {
+  const py = getPointerY(e);
+  if (screen === "play") jumpBuffer = 0.11;
+  else onMenuClick(py);
+});
+canvas.addEventListener("touchstart", e => {
+  e.preventDefault();
+  const py = getPointerY(e);
+  if (screen === "play") jumpBuffer = 0.11;
+  else onMenuClick(py);
+}, { passive: false });
+
+window.addEventListener("keydown", e => {
+  if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.code)) e.preventDefault();
+  if (e.code === "ArrowLeft" || e.code === "KeyA") keys.left = true;
+  if (e.code === "ArrowRight" || e.code === "KeyD") keys.right = true;
+  if (e.code === "Space" || e.code === "ArrowUp" || e.code === "KeyW") {
+    if (screen === "play") jumpBuffer = 0.11;
+    else if (screen === "title") screen = "maps";
+  }
+  if (e.code === "ShiftLeft" || e.code === "ShiftRight" || e.code === "KeyK") triggerDash();
+  if (e.code === "KeyR" && screen === "play") startRun(mapIndex);
+  if (e.code === "KeyM") { muted = !muted; document.getElementById("muteBtn").textContent = muted ? "SFX: OFF" : "SFX: ON"; }
+  if (e.code === "KeyQ" || e.code === "Escape") {
+    if (screen === "play") screen = "maps";
+    else if (screen === "maps" || screen === "heroes") screen = "title";
+    else if (screen === "title") screen = "quit";
+  }
+});
+window.addEventListener("keyup", e => {
+  if (e.code === "ArrowLeft" || e.code === "KeyA") keys.left = false;
+  if (e.code === "ArrowRight" || e.code === "KeyD") keys.right = false;
+  if ((e.code === "Space" || e.code === "ArrowUp" || e.code === "KeyW") && screen === "play" && player.vy < 0) {
+    player.vy *= 0.45;
+  }
+});
+
+function bindTouchButton(id, downFn, upFn) {
+  const el = document.getElementById(id);
+  el.addEventListener("touchstart", e => { e.preventDefault(); downFn(); }, { passive: false });
+  el.addEventListener("touchend", e => { e.preventDefault(); if (upFn) upFn(); }, { passive: false });
+  el.addEventListener("mousedown", downFn);
+  el.addEventListener("mouseup", () => { if (upFn) upFn(); });
+}
+bindTouchButton("moveLeft", () => { keys.left = true; }, () => { keys.left = false; });
+bindTouchButton("moveRight", () => { keys.right = true; }, () => { keys.right = false; });
+bindTouchButton("jumpBtn", () => { if (screen === "play") jumpBuffer = 0.11; }, () => { if (screen === "play" && player.vy < 0) player.vy *= 0.45; });
+bindTouchButton("dashBtn", triggerDash);
+
+document.getElementById("heroBtn").onclick = () => { screen = screen === "heroes" ? "title" : "heroes"; };
+document.getElementById("padBtn").onclick = () => { touchPad.classList.toggle("show"); };
+document.getElementById("muteBtn").onclick = () => { muted = !muted; document.getElementById("muteBtn").textContent = muted ? "SFX: OFF" : "SFX: ON"; };
+document.getElementById("fullBtn").onclick = () => {
+  if (!document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(() => {});
+  else document.exitFullscreen?.();
+};
+document.getElementById("quitBtn").onclick = () => {
+  if (screen === "play") screen = "maps";
+  else if (screen === "maps" || screen === "heroes") screen = "title";
+  else screen = "quit";
+};
+
+function updateLoop(dt) {
+  clock += dt;
+  if (screen === "play") {
+    const prevVy = movePlayer(dt);
+    stepEntities(dt, prevVy);
+  }
 }
 
 let prevTime = 0;

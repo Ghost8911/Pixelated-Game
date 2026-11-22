@@ -90,16 +90,6 @@ function step() {
       enemy.x += enemy.vx * dt;
       if (enemy.x < enemy.minX) { enemy.x = enemy.minX; enemy.vx = Math.abs(enemy.vx); }
       if (enemy.x + enemy.w > enemy.maxX) { enemy.x = enemy.maxX - enemy.w; enemy.vx = -Math.abs(enemy.vx); }
-
-      const hitX = p.x + p.w > enemy.x && p.x < enemy.x + enemy.w;
-      const hitY = p.y + p.h > enemy.y && p.y < enemy.y + enemy.h;
-      if (hitX && hitY) {
-        if (p.vy > 0 && prevY + p.h <= enemy.y + 10) {
-          enemy.alive = false; p.vy = -460; score += 200; beep(460, 0.09);
-        } else {
-          beep(150, 0.18); resetRun(false);
-        }
-      }
     }
 
     if (p.x + p.w > goal.x && p.x < goal.x + goal.w && p.y + p.h > goal.y) {

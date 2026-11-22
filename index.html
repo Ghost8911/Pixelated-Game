@@ -8,10 +8,17 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { width: 100%; height: 100%; overflow: hidden; background: #191a2e; font-family: monospace; }
   canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+  .pad { position: fixed; bottom: 14px; display: none; gap: 10px; z-index: 10; }
+  .pad-l { left: 14px; }
+  .pad-r { right: 14px; }
+  button.ctrl { width: 52px; height: 52px; border-radius: 8px; border: 2px solid #94a3b8; background: rgba(25,26,46,0.75); color: #fff; font: bold 14px monospace; touch-action: none; }
+  @media (pointer: coarse), (max-width: 700px) { .pad { display: flex; } }
 </style>
 </head>
 <body>
 <canvas id="game"></canvas>
+<div class="pad pad-l"><button class="ctrl" id="bL">&lt;</button><button class="ctrl" id="bR">&gt;</button></div>
+<div class="pad pad-r"><button class="ctrl" id="bD">DSH</button><button class="ctrl" id="bJ">JMP</button></div>
 <script>
 "use strict";
 
@@ -34,11 +41,137 @@ function resize() {
 addEventListener("resize", resize);
 resize();
 
-function update(dt) {}
+let audioCtx = null;
+const keys = { left: false, right: false };
+
+function sfx(freq, dur, type = "square", vol = 0.05) {
+  if (muted || quit) return;
+  if (!audioCtx) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    audioCtx = new AC();
+  }
+  const osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
+  osc.type = type; osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+  gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + dur);
+  osc.connect(gain); gain.connect(audioCtx.destination);
+  osc.start(); osc.stop(audioCtx.currentTime + dur);
+}
+
+function triggerDash() {
+  if (won || quit || dashCD > 0 || dashTimer > 0) return;
+  dashTimer = 0.14; dashCD = 0.62;
+  sfx(480, 0.08, "triangle", 0.05);
+}
+
+function bindBtn(id, down, up) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener("pointerdown", e => { e.preventDefault(); down(); });
+  el.addEventListener("pointerup", e => { e.preventDefault(); up(); });
+  el.addEventListener("pointercancel", up); el.addEventListener("pointerleave", up);
+}
+bindBtn("bL", () => (keys.left = true), () => (keys.left = false));
+bindBtn("bR", () => (keys.right = true), () => (keys.right = false));
+bindBtn("bJ", () => { jumpBuf = 0.12; }, () => {});
+bindBtn("bD", triggerDash, () => {});
+
+const grid = Array.from({ length: ROWS }, (_, r) =>
+  Array.from({ length: COLS }, (__, c) => (r >= 12 ? "G" : "."))
+);
+grid[12][14] = "."; grid[13][14] = ".";
+grid[12][15] = "."; grid[13][15] = ".";
+for (const x of [18, 19, 20]) grid[9][x] = "#";
+grid[11][27] = "=";
+
+const coinList = [{ x: 7, y: 10, taken: false }, { x: 19, y: 7, taken: false }];
+const spikes = [{ x: 22, y: 11 }];
+const player = { x: 64, y: 8 * TILE, w: 22, h: 28, vx: 0, vy: 0, grounded: false, dir: 1 };
+
+function solid(tx, ty) {
+  if (tx < 0 || tx >= COLS) return true;
+  if (ty < 0 || ty >= ROWS) return false;
+  return grid[ty][tx] === "G" || grid[ty][tx] === "#" || grid[ty][tx] === "=";
+}
+
+function respawn() {
+  player.x = 64; player.y = 8 * TILE; player.vx = 0; player.vy = 0;
+  coyote = 0; jumpBuf = 0; camX = 0;
+}
+
+function update(dt) {
+  if (won || quit) return;
+  const move = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
+  if (move && dashTimer <= 0) player.dir = move;
+
+  coyote = player.grounded ? 0.11 : Math.max(0, coyote - dt);
+  jumpBuf = Math.max(0, jumpBuf - dt);
+  dashCD = Math.max(0, dashCD - dt);
+
+  if (jumpBuf > 0 && coyote > 0 && dashTimer <= 0) {
+    player.vy = -695; player.grounded = false; coyote = 0; jumpBuf = 0;
+    sfx(350, 0.1, "square", 0.05);
+  }
+  if (dashTimer > 0) {
+    dashTimer -= dt; player.vx = player.dir * 510; player.vy = 0;
+  } else {
+    player.vx = move * 225;
+    player.vy = Math.min(920, player.vy + GRAVITY * dt);
+  }
+
+  player.x += player.vx * dt;
+  for (let ty = Math.floor(player.y / TILE); ty <= Math.floor((player.y + player.h - 0.01) / TILE); ty++) {
+    for (let tx = Math.floor(player.x / TILE); tx <= Math.floor((player.x + player.w - 0.01) / TILE); tx++) {
+      if (solid(tx, ty)) {
+        if (player.vx > 0) player.x = tx * TILE - player.w;
+        else if (player.vx < 0) player.x = (tx + 1) * TILE;
+      }
+    }
+  }
+
+  player.y += player.vy * dt;
+  player.grounded = false;
+  for (let ty = Math.floor(player.y / TILE); ty <= Math.floor((player.y + player.h - 0.01) / TILE); ty++) {
+    for (let tx = Math.floor(player.x / TILE); tx <= Math.floor((player.x + player.w - 0.01) / TILE); tx++) {
+      if (solid(tx, ty) && player.vy > 0) {
+        player.y = ty * TILE - player.h; player.grounded = true; player.vy = 0;
+      }
+    }
+  }
+
+  if (player.y > ROWS * TILE + 20) { sfx(140, 0.22, "sawtooth", 0.06); respawn(); }
+  camX = Math.max(0, Math.min(COLS * TILE - viewW, player.x - viewW * 0.35));
+}
+
 function render() {
   ctx.fillStyle = "#191a2e";
   ctx.fillRect(0, 0, viewW, viewH);
+  ctx.fillStyle = "#fff";
+  ctx.font = "bold 14px monospace";
+  ctx.fillText(`COINS x${coins}  SCORE ${score}  [M] SFX:${muted ? "OFF" : "ON"}  [Q] QUIT`, 14, 24);
+  if (quit) {
+    ctx.fillStyle = "#ff6b6b";
+    ctx.font = "bold 20px monospace";
+    ctx.fillText("QUIT — Press Q to resume", 14, 62);
+  }
 }
+
+addEventListener("keydown", e => {
+  if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.code)) e.preventDefault();
+  if (e.code === "ArrowLeft" || e.code === "KeyA") keys.left = true;
+  if (e.code === "ArrowRight" || e.code === "KeyD") keys.right = true;
+  if (e.code === "Space" || e.code === "ArrowUp" || e.code === "KeyW") jumpBuf = 0.12;
+  if ((e.code === "ShiftLeft" || e.code === "ShiftRight" || e.code === "KeyK") && dashCD <= 0 && dashTimer <= 0) {
+    dashTimer = 0.14; dashCD = 0.62;
+  }
+  if (e.code === "KeyM") muted = !muted;
+  if (e.code === "KeyQ") quit = !quit;
+});
+addEventListener("keyup", e => {
+  if (e.code === "ArrowLeft" || e.code === "KeyA") keys.left = false;
+  if (e.code === "ArrowRight" || e.code === "KeyD") keys.right = false;
+});
 
 let last = 0;
 function loop(ts) {

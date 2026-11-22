@@ -17,48 +17,72 @@ const plat = { x: 220, y: 270, w: 120, h: 18 };
 const coin = { x: 280, y: 235, r: 8, taken: false };
 const enemy = { x: 420, y: ground - 24, w: 22, h: 24, vx: -70, minX: 360, maxX: 540, alive: true };
 const goal = { x: 620, y: ground - 40, w: 18, h: 40 };
-const p = { x: 60, y: ground - 24, w: 20, h: 24, speed: 220, vy: 0, grounded: true };
+const p = { x: 60, y: ground - 24, w: 20, h: 24, speed: 220, vy: 0, grounded: true, dir: 1 };
 const keys = {};
-let score = 0, won = false;
+let score = 0, won = false, paused = false, muted = false;
+let dashTime = 0, dashCD = 0, audio = null;
+
+function beep(freq, sec) {
+  if (muted) return;
+  if (!audio) audio = new (window.AudioContext || window.webkitAudioContext)();
+  const o = audio.createOscillator(), g = audio.createGain();
+  o.frequency.value = freq; g.gain.value = 0.04;
+  o.connect(g); g.connect(audio.destination);
+  o.start(); o.stop(audio.currentTime + sec);
+}
+
+function resetRun(full = false) {
+  p.x = 60; p.y = ground - p.h; p.vy = 0; p.grounded = true;
+  dashTime = 0;
+  if (full) {
+    won = false; paused = false; score = 0; coin.taken = false;
+    enemy.alive = true; enemy.x = 420; enemy.vx = -70;
+  }
+}
 
 addEventListener("resize", () => { c.width = innerWidth; c.height = innerHeight; });
-addEventListener("keydown", e => { keys[e.code] = true; });
+addEventListener("keydown", e => {
+  keys[e.code] = true;
+  if ((e.code === "ShiftLeft" || e.code === "ShiftRight" || e.code === "KeyK") && dashCD <= 0 && !won && !paused) {
+    dashTime = 0.14; dashCD = 0.6; beep(520, 0.08);
+  }
+  if (e.code === "KeyM") muted = !muted;
+  if (e.code === "KeyQ") paused = !paused;
+  if (e.code === "KeyR") resetRun(true);
+});
 addEventListener("keyup", e => { keys[e.code] = false; });
 c.width = innerWidth; c.height = innerHeight;
 
-function resetPlayer() {
-  p.x = 60; p.y = ground - p.h; p.vy = 0; p.grounded = true;
-}
-
 function loop() {
   const dt = 1 / 60;
-  if (!won) {
+  if (!won && !paused) {
     const dir = (keys.ArrowRight || keys.KeyD ? 1 : 0) - (keys.ArrowLeft || keys.KeyA ? 1 : 0);
-    p.x = Math.max(0, Math.min(c.width - p.w, p.x + dir * p.speed * dt));
+    if (dir) p.dir = dir;
+    dashCD = Math.max(0, dashCD - dt);
 
-    if ((keys.Space || keys.ArrowUp || keys.KeyW) && p.grounded) {
-      p.vy = -620;
-      p.grounded = false;
+    if ((keys.Space || keys.ArrowUp || keys.KeyW) && p.grounded && dashTime <= 0) {
+      p.vy = -620; p.grounded = false; beep(340, 0.09);
     }
+
     const prevY = p.y;
-    p.vy += grav * dt;
+    if (dashTime > 0) {
+      dashTime -= dt;
+      p.x = Math.max(0, Math.min(c.width - p.w, p.x + p.dir * 500 * dt));
+      p.vy = 0;
+    } else {
+      p.x = Math.max(0, Math.min(c.width - p.w, p.x + dir * p.speed * dt));
+      p.vy += grav * dt;
+    }
     p.y += p.vy * dt;
     p.grounded = false;
 
-    if (p.y >= ground - p.h) {
-      p.y = ground - p.h;
-      p.vy = 0;
-      p.grounded = true;
-    }
+    if (p.y >= ground - p.h) { p.y = ground - p.h; p.vy = 0; p.grounded = true; }
     if (p.vy >= 0 && prevY + p.h <= plat.y && p.y + p.h >= plat.y && p.x + p.w > plat.x && p.x < plat.x + plat.w) {
-      p.y = plat.y - p.h;
-      p.vy = 0;
-      p.grounded = true;
+      p.y = plat.y - p.h; p.vy = 0; p.grounded = true;
     }
 
     if (!coin.taken && Math.hypot(p.x + p.w / 2 - coin.x, p.y + p.h / 2 - coin.y) < coin.r + 14) {
-      coin.taken = true;
-      score += 100;
+      coin.taken = true; score += 100; beep(880, 0.08);
     }
 
     if (enemy.alive) {
@@ -68,17 +92,15 @@ function loop() {
 
       if (p.x + p.w > enemy.x && p.x < enemy.x + enemy.w && p.y + p.h > enemy.y && p.y < enemy.y + enemy.h) {
         if (p.vy > 0 && prevY + p.h <= enemy.y + 10) {
-          enemy.alive = false;
-          p.vy = -460;
-          score += 200;
+          enemy.alive = false; p.vy = -460; score += 200; beep(460, 0.09);
         } else {
-          resetPlayer();
+          beep(150, 0.18); resetRun(false);
         }
       }
     }
 
     if (p.x + p.w > goal.x && p.x < goal.x + goal.w && p.y + p.h > goal.y) {
-      won = true;
+      won = true; beep(780, 0.2);
     }
   }
 
@@ -92,9 +114,14 @@ function loop() {
   if (enemy.alive) {
     ctx.fillStyle = "#9e2a2b"; ctx.fillRect(enemy.x, enemy.y, enemy.w, enemy.h);
   }
-  ctx.fillStyle = "#e03131"; ctx.fillRect(p.x, p.y, p.w, p.h);
-  ctx.fillStyle = "#fff"; ctx.font = "bold 16px monospace";
-  ctx.fillText("SCORE " + score + (won ? "  |  GOAL REACHED!" : ""), 16, 28);
+  ctx.fillStyle = dashTime > 0 ? "#ffd166" : "#e03131";
+  ctx.fillRect(p.x, p.y, p.w, p.h);
+
+  ctx.fillStyle = "#fff"; ctx.font = "bold 15px monospace";
+  ctx.fillText(`SCORE ${score}  [M] SFX:${muted ? "OFF" : "ON"}  [Q] PAUSE  [R] RESET${won ? "  |  GOAL REACHED!" : ""}`, 16, 28);
+  if (paused && !won) {
+    ctx.fillStyle = "#ffd166"; ctx.fillText("PAUSED (press Q)", 16, 54);
+  }
   requestAnimationFrame(loop);
 }
 loop();

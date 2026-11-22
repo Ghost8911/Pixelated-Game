@@ -20,17 +20,17 @@
   }
   button.ctrl:active { background: rgba(255, 209, 102, 0.4); }
   @media (pointer: coarse), (max-width: 700px) {
-    .pad { display: flex; }
+    .pad.active { display: flex; }
   }
 </style>
 </head>
 <body>
 <canvas id="game"></canvas>
-<div class="pad pad-left">
+<div class="pad pad-left" id="padLeft">
   <button class="ctrl" id="btnLeft">&lt;</button>
   <button class="ctrl" id="btnRight">&gt;</button>
 </div>
-<div class="pad pad-right">
+<div class="pad pad-right" id="padRight">
   <button class="ctrl" id="btnDash">DSH</button>
   <button class="ctrl" id="btnJump">JMP</button>
 </div>
@@ -39,6 +39,8 @@
 
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
+const padLeft = document.getElementById("padLeft");
+const padRight = document.getElementById("padRight");
 
 const TILE = 32;
 const ROWS = 14;
@@ -50,6 +52,7 @@ let viewH = 450;
 let lives = 3;
 let score = 0;
 let coins = 0;
+let onTitle = true;
 let won = false;
 let gameOver = false;
 let camX = 0;
@@ -62,6 +65,9 @@ let walkTime = 0;
 let muted = false;
 let audioCtx = null;
 const particles = [];
+
+const stageCards = [];
+let startBtnRect = null;
 
 function sfx(freq, dur, type = "square", vol = 0.05) {
   if (muted) return;
@@ -106,6 +112,12 @@ function updateParticles(dt) {
     p.life -= dt;
     if (p.life <= 0) particles.splice(i, 1);
   }
+}
+
+function syncTouchPad() {
+  const show = !onTitle && !won && !gameOver;
+  padLeft.classList.toggle("active", show);
+  padRight.classList.toggle("active", show);
 }
 
 function resizeCanvas() {
@@ -180,14 +192,34 @@ const enemy = {
 
 const keys = { left: false, right: false };
 
+function startRun(idx = stageIdx) {
+  lives = 3;
+  score = 0;
+  coins = 0;
+  gameOver = false;
+  hurtTimer = 0;
+  onTitle = false;
+  loadStage(idx);
+  syncTouchPad();
+  sfx(523, 0.1, "triangle", 0.06);
+}
+
+function openTitle() {
+  onTitle = true;
+  won = false;
+  gameOver = false;
+  keys.left = false;
+  keys.right = false;
+  syncTouchPad();
+}
+
 function triggerDash() {
-  if (dashCooldown <= 0 && dashTimer <= 0 && !won && !gameOver) {
-    dashTimer = 0.14;
-    dashCooldown = 0.62;
-    player.vy = 0;
-    sfx(480, 0.08, "triangle", 0.05);
-    spawnBurst(player.x + player.w / 2, player.y + player.h / 2, "#ffd166", 6);
-  }
+  if (onTitle || dashCooldown > 0 || dashTimer > 0 || won || gameOver) return;
+  dashTimer = 0.14;
+  dashCooldown = 0.62;
+  player.vy = 0;
+  sfx(480, 0.08, "triangle", 0.05);
+  spawnBurst(player.x + player.w / 2, player.y + player.h / 2, "#ffd166", 6);
 }
 
 function isSolid(tx, ty) {
@@ -215,6 +247,7 @@ function hurtPlayer() {
   if (lives <= 0) {
     lives = 0;
     gameOver = true;
+    syncTouchPad();
     return;
   }
   hurtTimer = 1.0;
@@ -222,7 +255,7 @@ function hurtPlayer() {
 }
 
 function loadStage(idx) {
-  stageIdx = idx % STAGES.length;
+  stageIdx = ((idx % STAGES.length) + STAGES.length) % STAGES.length;
   const s = STAGES[stageIdx];
   grid = Array.from({ length: ROWS }, (_, r) =>
     Array.from({ length: cols }, (__, c) => (r >= 12 ? "G" : "."))
@@ -239,8 +272,10 @@ function loadStage(idx) {
   particles.length = 0;
   won = false;
   resetPlayer();
+  syncTouchPad();
 }
 loadStage(0);
+openTitle();
 
 function updatePlayer(dt) {
   if (hurtTimer > 0) hurtTimer -= dt;
@@ -374,12 +409,13 @@ function updateStageItems() {
       spawnBurst(gx * TILE + 16, gy * TILE, "#38b000", 16);
     }
     won = true;
+    syncTouchPad();
   }
 }
 
 function update(dt) {
   updateParticles(dt);
-  if (won || gameOver) return;
+  if (onTitle || won || gameOver) return;
   const prevVy = updatePlayer(dt);
   updateEnemy(dt, prevVy);
   updateStageItems();
@@ -454,6 +490,78 @@ function drawSkyBody() {
   }
 }
 
+function drawTitleOverlay() {
+  ctx.fillStyle = "rgba(10, 12, 24, 0.72)";
+  ctx.fillRect(0, 0, viewW, viewH);
+
+  ctx.fillStyle = "#ffd166";
+  ctx.font = "bold 36px monospace";
+  ctx.textAlign = "center";
+  ctx.fillText("ZEPHRYS", viewW / 2, 82);
+
+  ctx.fillStyle = "#cbd5e1";
+  ctx.font = "13px monospace";
+  ctx.fillText("CHOOSE MAP (1-3 or CLICK)  |  A/D or ARROWS: MOVE  SPACE: JUMP  SHIFT/K: DASH", viewW / 2, 110);
+
+  stageCards.length = 0;
+  const gap = 14;
+  const cardW = Math.min(210, Math.floor((viewW - 60 - gap * (STAGES.length - 1)) / STAGES.length));
+  const cardH = 112;
+  const totalW = cardW * STAGES.length + gap * (STAGES.length - 1);
+  const startX = Math.floor((viewW - totalW) / 2);
+  const cardY = 136;
+
+  STAGES.forEach((st, i) => {
+    const x = startX + i * (cardW + gap);
+    const selected = i === stageIdx;
+    stageCards.push({ x, y: cardY, w: cardW, h: cardH, idx: i });
+
+    ctx.fillStyle = st.sky;
+    ctx.fillRect(x, cardY, cardW, cardH);
+
+    // Mini map strip preview inside card
+    ctx.fillStyle = "rgba(255,255,255,0.08)";
+    ctx.fillRect(x + 10, cardY + 38, cardW - 20, 42);
+    ctx.fillStyle = "#38b000";
+    ctx.fillRect(x + 10, cardY + 72, cardW - 20, 8);
+    ctx.fillStyle = "#f59e0b";
+    ctx.fillRect(x + cardW - 24, cardY + 60, 8, 12);
+
+    ctx.strokeStyle = selected ? "#ffd166" : "rgba(255,255,255,0.28)";
+    ctx.lineWidth = selected ? 3 : 1.5;
+    ctx.strokeRect(x, cardY, cardW, cardH);
+
+    ctx.fillStyle = selected ? "#ffd166" : "#fff";
+    ctx.font = "bold 13px monospace";
+    ctx.fillText(st.name, x + cardW / 2, cardY + 24);
+
+    ctx.fillStyle = "#e2e8f0";
+    ctx.font = "11px monospace";
+    ctx.fillText(`${st.coins.length} COINS  ${st.spikes.length} SPIKES`, x + cardW / 2, cardY + 98);
+  });
+
+  const btnW = 196;
+  const btnH = 44;
+  const btnX = Math.floor((viewW - btnW) / 2);
+  const btnY = cardY + cardH + 26;
+  startBtnRect = { x: btnX, y: btnY, w: btnW, h: btnH };
+
+  ctx.fillStyle = "#2b8a3e";
+  ctx.fillRect(btnX, btnY, btnW, btnH);
+  ctx.strokeStyle = "#ffd166";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(btnX, btnY, btnW, btnH);
+
+  ctx.fillStyle = "#fff";
+  ctx.font = "bold 16px monospace";
+  ctx.fillText("START GAME", viewW / 2, btnY + 28);
+
+  ctx.fillStyle = "#94a3b8";
+  ctx.font = "12px monospace";
+  ctx.fillText("Press ENTER or SPACE to play selected map", viewW / 2, btnY + btnH + 24);
+  ctx.textAlign = "left";
+}
+
 function render() {
   ctx.fillStyle = STAGES[stageIdx].sky;
   ctx.fillRect(0, 0, viewW, viewH);
@@ -522,6 +630,11 @@ function render() {
   }
   ctx.restore();
 
+  if (onTitle) {
+    drawTitleOverlay();
+    return;
+  }
+
   ctx.fillStyle = "#fff";
   ctx.font = "bold 14px monospace";
   ctx.fillText(`${STAGES[stageIdx].name} | LIVES x${lives}  COINS x${coins}  SCORE ${score}  [M] SFX:${muted ? "OFF" : "ON"}`, 14, 24);
@@ -535,6 +648,28 @@ function render() {
     ctx.fillText("GAME OVER! Press R to restart", 14, 64);
   }
 }
+
+canvas.addEventListener("pointerdown", e => {
+  if (!onTitle) return;
+  const rect = canvas.getBoundingClientRect();
+  const vx = ((e.clientX - rect.left) / Math.max(1, rect.width)) * viewW;
+  const vy = ((e.clientY - rect.top) / Math.max(1, rect.height)) * viewH;
+
+  for (const card of stageCards) {
+    if (vx >= card.x && vx <= card.x + card.w && vy >= card.y && vy <= card.y + card.h) {
+      stageIdx = card.idx;
+      loadStage(stageIdx);
+      onTitle = true;
+      syncTouchPad();
+      sfx(440, 0.06, "square", 0.04);
+      return;
+    }
+  }
+
+  if (startBtnRect && vx >= startBtnRect.x && vx <= startBtnRect.x + startBtnRect.w && vy >= startBtnRect.y && vy <= startBtnRect.y + startBtnRect.h) {
+    startRun(stageIdx);
+  }
+});
 
 function bindHold(id, onDown, onUp) {
   const el = document.getElementById(id);
@@ -551,6 +686,18 @@ bindHold("btnDash", () => { triggerDash(); }, () => {});
 
 window.addEventListener("keydown", e => {
   if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.code)) e.preventDefault();
+
+  if (onTitle) {
+    if (e.code === "Digit1") { stageIdx = 0; loadStage(0); onTitle = true; sfx(440, 0.06, "square", 0.04); }
+    else if (e.code === "Digit2") { stageIdx = 1; loadStage(1); onTitle = true; sfx(440, 0.06, "square", 0.04); }
+    else if (e.code === "Digit3") { stageIdx = 2; loadStage(2); onTitle = true; sfx(440, 0.06, "square", 0.04); }
+    else if (e.code === "ArrowLeft" || e.code === "KeyA") { stageIdx = (stageIdx + STAGES.length - 1) % STAGES.length; loadStage(stageIdx); onTitle = true; }
+    else if (e.code === "ArrowRight" || e.code === "KeyD") { stageIdx = (stageIdx + 1) % STAGES.length; loadStage(stageIdx); onTitle = true; }
+    else if (e.code === "Enter" || e.code === "Space") startRun(stageIdx);
+    else if (e.code === "KeyM") muted = !muted;
+    return;
+  }
+
   if (e.code === "ArrowLeft" || e.code === "KeyA") keys.left = true;
   if (e.code === "ArrowRight" || e.code === "KeyD") keys.right = true;
   if (e.code === "Space" || e.code === "ArrowUp" || e.code === "KeyW") {
@@ -570,6 +717,9 @@ window.addEventListener("keydown", e => {
     gameOver = false;
     hurtTimer = 0;
     loadStage(0);
+  }
+  if (e.code === "Escape") {
+    openTitle();
   }
 });
 window.addEventListener("keyup", e => {

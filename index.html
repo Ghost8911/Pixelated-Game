@@ -47,22 +47,43 @@ function resizeCanvas() {
 window.addEventListener("resize", resizeCanvas);
 resizeCanvas();
 
-const cols = 30;
-const grid = Array.from({ length: ROWS }, (_, r) =>
-  Array.from({ length: cols }, (__, c) => (r >= 12 ? "G" : "."))
-);
-grid[12][14] = "."; grid[13][14] = ".";
-grid[12][15] = "."; grid[13][15] = ".";
-grid[9][18] = "#"; grid[9][19] = "#"; grid[9][20] = "#";
-grid[11][27] = "=";
+const STAGES = [
+  {
+    name: "1. Moonlit Lake",
+    sky: "#191a2e",
+    pit: [14, 15],
+    bricks: [[9, 18], [9, 19], [9, 20]],
+    coins: [[7, 10], [19, 7]],
+    spikes: [[22, 11]],
+    enemyX: 10
+  },
+  {
+    name: "2. Emerald Plains",
+    sky: "#1e3a5f",
+    pit: [11, 12, 20, 21],
+    bricks: [[9, 10], [9, 11], [8, 19], [8, 20]],
+    coins: [[10, 7], [20, 6], [24, 10]],
+    spikes: [[16, 11]],
+    enemyX: 14
+  },
+  {
+    name: "3. Canyon Dusk",
+    sky: "#3b2f63",
+    pit: [9, 10, 17, 18, 19],
+    bricks: [[9, 8], [9, 9], [8, 16], [8, 17], [8, 18]],
+    coins: [[9, 7], [17, 6], [23, 10]],
+    spikes: [[13, 11], [24, 11]],
+    enemyX: 12
+  }
+];
 
-const coinList = [
-  { x: 7, y: 10, taken: false },
-  { x: 19, y: 7, taken: false }
-];
-const spikes = [
-  { x: 22, y: 11 }
-];
+const cols = 30;
+let stageIdx = 0;
+let grid = [];
+let coinList = [];
+let spikes = [];
+let coins = 0;
+let won = false;
 
 const player = {
   x: 64,

@@ -21,11 +21,15 @@ const ctx = canvas.getContext("2d");
 const TILE = 32;
 const ROWS = 14;
 const GRAVITY = 1750;
+const STOMP_BOUNCE = 490;
 
 let viewW = 800;
 let viewH = 450;
 let lives = 3;
+let score = 0;
 let camX = 0;
+let dashTimer = 0;
+let dashCooldown = 0;
 
 function resizeCanvas() {
   const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -57,6 +61,15 @@ const player = {
   facing: 1
 };
 
+const enemy = {
+  x: 10 * TILE,
+  y: 12 * TILE - 26,
+  w: 24,
+  h: 26,
+  vx: -60,
+  alive: true
+};
+
 const keys = { left: false, right: false };
 
 function isSolid(tx, ty) {
@@ -75,9 +88,17 @@ function resetPlayer() {
 
 function updatePlayer(dt) {
   const dir = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
-  if (dir !== 0) player.facing = dir;
-  player.vx = dir * 225;
-  player.vy = Math.min(920, player.vy + GRAVITY * dt);
+  if (dir !== 0 && dashTimer <= 0) player.facing = dir;
+
+  if (dashCooldown > 0) dashCooldown -= dt;
+  if (dashTimer > 0) {
+    dashTimer -= dt;
+    player.vx = player.facing * 510;
+    player.vy = 0;
+  } else {
+    player.vx = dir * 225;
+    player.vy = Math.min(920, player.vy + GRAVITY * dt);
+  }
 
   player.x += player.vx * dt;
   const x0 = Math.floor(player.x / TILE);
@@ -93,6 +114,7 @@ function updatePlayer(dt) {
     }
   }
 
+  const prevVy = player.vy;
   player.y += player.vy * dt;
   player.onGround = false;
   const fy0 = Math.floor(player.y / TILE);
@@ -115,10 +137,38 @@ function updatePlayer(dt) {
   }
 
   camX = Math.max(0, Math.min(cols * TILE - viewW, player.x - viewW * 0.35));
+  return prevVy;
+}
+
+function updateEnemy(dt, prevVy) {
+  if (!enemy.alive) return;
+  enemy.x += enemy.vx * dt;
+
+  const aheadX = Math.floor((enemy.x + (enemy.vx > 0 ? enemy.w : 0)) / TILE);
+  const footY = Math.floor((enemy.y + enemy.h + 4) / TILE);
+  if (isSolid(aheadX, 11) || !isSolid(aheadX, footY)) enemy.vx *= -1;
+
+  if (
+    player.x < enemy.x + enemy.w && player.x + player.w > enemy.x &&
+    player.y < enemy.y + enemy.h && player.y + player.h > enemy.y
+  ) {
+    const stomping = prevVy > 0 && (player.y + player.h - prevVy * dt <= enemy.y + 12);
+    if (stomping) {
+      enemy.alive = false;
+      player.y = enemy.y - player.h - 1;
+      player.vy = -STOMP_BOUNCE;
+      player.onGround = false;
+      score += 200;
+    } else {
+      lives = Math.max(1, lives - 1);
+      resetPlayer();
+    }
+  }
 }
 
 function update(dt) {
-  updatePlayer(dt);
+  const prevVy = updatePlayer(dt);
+  updateEnemy(dt, prevVy);
 }
 
 function render() {
@@ -137,13 +187,19 @@ function render() {
       }
     }
   }
-  ctx.fillStyle = "#e03131";
+
+  if (enemy.alive) {
+    ctx.fillStyle = "#9e2a2b";
+    ctx.fillRect(enemy.x, enemy.y, enemy.w, enemy.h);
+  }
+
+  ctx.fillStyle = dashTimer > 0 ? "#ffd166" : "#e03131";
   ctx.fillRect(player.x, player.y, player.w, player.h);
   ctx.restore();
 
   ctx.fillStyle = "#fff";
   ctx.font = "bold 14px monospace";
-  ctx.fillText(`LIVES x${lives}`, 14, 24);
+  ctx.fillText(`LIVES x${lives}  SCORE ${score}`, 14, 24);
 }
 
 window.addEventListener("keydown", e => {
@@ -153,6 +209,11 @@ window.addEventListener("keydown", e => {
   if ((e.code === "Space" || e.code === "ArrowUp" || e.code === "KeyW") && player.onGround) {
     player.vy = -695;
     player.onGround = false;
+  }
+  if ((e.code === "ShiftLeft" || e.code === "ShiftRight" || e.code === "KeyK") && dashCooldown <= 0 && dashTimer <= 0) {
+    dashTimer = 0.14;
+    dashCooldown = 0.62;
+    player.vy = 0;
   }
 });
 window.addEventListener("keyup", e => {

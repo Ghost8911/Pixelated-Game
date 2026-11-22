@@ -17,22 +17,10 @@
 
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
+const TILE = 32, ROWS = 14, COLS = 30, GRAVITY = 1750;
 
-const TILE = 32;
-const ROWS = 14;
-const COLS = 30;
-const GRAVITY = 1750;
-
-let viewW = 800;
-let viewH = 450;
-let camX = 0;
-let score = 0;
-let coins = 0;
-let won = false;
-let dashTimer = 0;
-let dashCD = 0;
-let coyote = 0;
-let jumpBuf = 0;
+let viewW = 800, viewH = 450, camX = 0, score = 0, coins = 0, won = false, quit = false, muted = false;
+let dashTimer = 0, dashCD = 0, coyote = 0, jumpBuf = 0;
 
 function resize() {
   const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -46,151 +34,18 @@ function resize() {
 addEventListener("resize", resize);
 resize();
 
-const grid = Array.from({ length: ROWS }, (_, r) =>
-  Array.from({ length: COLS }, (__, c) => (r >= 12 ? "G" : "."))
-);
-grid[12][14] = "."; grid[13][14] = ".";
-grid[12][15] = "."; grid[13][15] = ".";
-for (const x of [18, 19, 20]) grid[9][x] = "#";
-grid[11][27] = "=";
-
-const coinList = [{ x: 7, y: 10, taken: false }, { x: 19, y: 7, taken: false }];
-const spikes = [{ x: 22, y: 11 }];
-const keys = { left: false, right: false };
-
-const player = { x: 64, y: 8 * TILE, w: 22, h: 28, vx: 0, vy: 0, grounded: false, dir: 1 };
-const enemy = { x: 10 * TILE, y: 12 * TILE - 26, w: 24, h: 26, vx: -65, alive: true };
-
-function solid(tx, ty) {
-  if (tx < 0 || tx >= COLS) return true;
-  if (ty < 0 || ty >= ROWS) return false;
-  return grid[ty][tx] === "G" || grid[ty][tx] === "#" || grid[ty][tx] === "=";
-}
-
-function respawn() {
-  player.x = 64; player.y = 8 * TILE; player.vx = 0; player.vy = 0;
-  coyote = 0; jumpBuf = 0; camX = 0;
-}
-
-function update(dt) {
-  if (won) return;
-  const move = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
-  if (move && dashTimer <= 0) player.dir = move;
-
-  coyote = player.grounded ? 0.11 : Math.max(0, coyote - dt);
-  jumpBuf = Math.max(0, jumpBuf - dt);
-  dashCD = Math.max(0, dashCD - dt);
-
-  if (jumpBuf > 0 && coyote > 0 && dashTimer <= 0) {
-    player.vy = -695; player.grounded = false; coyote = 0; jumpBuf = 0;
-  }
-  if (dashTimer > 0) {
-    dashTimer -= dt;
-    player.vx = player.dir * 510;
-    player.vy = 0;
-  } else {
-    player.vx = move * 225;
-    player.vy = Math.min(920, player.vy + GRAVITY * dt);
-  }
-
-  player.x += player.vx * dt;
-  for (let ty = Math.floor(player.y / TILE); ty <= Math.floor((player.y + player.h - 0.01) / TILE); ty++) {
-    for (let tx = Math.floor(player.x / TILE); tx <= Math.floor((player.x + player.w - 0.01) / TILE); tx++) {
-      if (solid(tx, ty)) {
-        if (player.vx > 0) player.x = tx * TILE - player.w;
-        else if (player.vx < 0) player.x = (tx + 1) * TILE;
-      }
-    }
-  }
-
-  const prevVy = player.vy;
-  player.y += player.vy * dt;
-  player.grounded = false;
-  for (let ty = Math.floor(player.y / TILE); ty <= Math.floor((player.y + player.h - 0.01) / TILE); ty++) {
-    for (let tx = Math.floor(player.x / TILE); tx <= Math.floor((player.x + player.w - 0.01) / TILE); tx++) {
-      if (solid(tx, ty) && player.vy > 0) {
-        player.y = ty * TILE - player.h; player.grounded = true; player.vy = 0;
-      }
-    }
-  }
-
-  if (player.y > ROWS * TILE + 20) respawn();
-  camX = Math.max(0, Math.min(COLS * TILE - viewW, player.x - viewW * 0.35));
-
-  if (enemy.alive) {
-    enemy.x += enemy.vx * dt;
-    const ax = Math.floor((enemy.x + (enemy.vx > 0 ? enemy.w : 0)) / TILE);
-    const fy = Math.floor((enemy.y + enemy.h + 4) / TILE);
-    if (solid(ax, 11) || !solid(ax, fy)) enemy.vx *= -1;
-    if (player.x < enemy.x + enemy.w && player.x + player.w > enemy.x && player.y < enemy.y + enemy.h && player.y + player.h > enemy.y) {
-      if (prevVy > 0 && player.y + player.h - prevVy * dt <= enemy.y + 12) {
-        enemy.alive = false; player.vy = -490; score += 200;
-      } else respawn();
-    }
-  }
-
-  for (const c of coinList) {
-    if (!c.taken && Math.abs(player.x + player.w / 2 - (c.x * TILE + 16)) < 20 && Math.abs(player.y + player.h / 2 - (c.y * TILE + 16)) < 20) {
-      c.taken = true; coins++; score += 100;
-    }
-  }
-  for (const s of spikes) {
-    if (player.x < s.x * TILE + 24 && player.x + player.w > s.x * TILE + 8 && player.y + player.h > s.y * TILE + 12) respawn();
-  }
-  const gx = Math.floor((player.x + player.w / 2) / TILE);
-  const gy = Math.floor((player.y + player.h + 2) / TILE);
-  if (grid[gy] && grid[gy][gx] === "=") won = true;
-}
-
+function update(dt) {}
 function render() {
   ctx.fillStyle = "#191a2e";
   ctx.fillRect(0, 0, viewW, viewH);
-  ctx.save();
-  ctx.translate(-camX, viewH - ROWS * TILE);
-
-  for (let y = 0; y < ROWS; y++) {
-    for (let x = 0; x < COLS; x++) {
-      const ch = grid[y][x];
-      if (ch === "G") { ctx.fillStyle = "#8b542b"; ctx.fillRect(x * TILE, y * TILE, TILE, TILE); ctx.fillStyle = "#38b000"; ctx.fillRect(x * TILE, y * TILE, TILE, 8); }
-      else if (ch === "#") { ctx.fillStyle = "#b85d2b"; ctx.fillRect(x * TILE, y * TILE, TILE, TILE); }
-      else if (ch === "=") { ctx.fillStyle = "#f59e0b"; ctx.fillRect(x * TILE, y * TILE, TILE, TILE); }
-    }
-  }
-  for (const c of coinList) if (!c.taken) { ctx.fillStyle = "#ffd166"; ctx.fillRect(c.x * TILE + 10, c.y * TILE + 10, 12, 12); }
-  for (const s of spikes) { ctx.fillStyle = "#cbd5e1"; ctx.fillRect(s.x * TILE + 8, s.y * TILE + 14, 16, 18); }
-  if (enemy.alive) { ctx.fillStyle = "#9e2a2b"; ctx.fillRect(enemy.x, enemy.y, enemy.w, enemy.h); }
-  ctx.fillStyle = dashTimer > 0 ? "#ffd166" : "#e03131";
-  ctx.fillRect(player.x, player.y, player.w, player.h);
-  ctx.restore();
-
-  ctx.fillStyle = "#fff";
-  ctx.font = "bold 14px monospace";
-  ctx.fillText(`COINS x${coins}  SCORE ${score}${won ? "  |  CLEAR! (R to reset)" : ""}`, 14, 24);
 }
-
-addEventListener("keydown", e => {
-  if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.code)) e.preventDefault();
-  if (e.code === "ArrowLeft" || e.code === "KeyA") keys.left = true;
-  if (e.code === "ArrowRight" || e.code === "KeyD") keys.right = true;
-  if (e.code === "Space" || e.code === "ArrowUp" || e.code === "KeyW") jumpBuf = 0.12;
-  if ((e.code === "ShiftLeft" || e.code === "ShiftRight" || e.code === "KeyK") && dashCD <= 0 && dashTimer <= 0) {
-    dashTimer = 0.14; dashCD = 0.62; player.vy = 0;
-  }
-  if (e.code === "KeyR") {
-    won = false; score = 0; coins = 0; enemy.alive = true;
-    coinList.forEach(c => (c.taken = false)); respawn();
-  }
-});
-addEventListener("keyup", e => {
-  if (e.code === "ArrowLeft" || e.code === "KeyA") keys.left = false;
-  if (e.code === "ArrowRight" || e.code === "KeyD") keys.right = false;
-});
 
 let last = 0;
 function loop(ts) {
   const dt = Math.min(0.033, (ts - last) / 1000 || 0);
   last = ts;
-  update(dt); render();
+  update(dt);
+  render();
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);

@@ -11,4 +11,4 @@ Hey, this is a game I made called Zephrys.
 - Dash: Shift or K
 - Restart: R · Mute: M · Quit/Back: Q or Esc
 
-Just click this `https://ghost8911.github.io/Pixelated-Game/` to play it
+Just copy and paste it in any web browser `https://ghost8911.github.io/Pixelated-Game/` to play it

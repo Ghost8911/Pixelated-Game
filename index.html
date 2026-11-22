@@ -209,6 +209,7 @@ function updatePlayer(dt) {
 
   if (player.y > ROWS * TILE + 20) {
     lives = Math.max(1, lives - 1);
+    sfx(140, 0.22, "sawtooth", 0.06);
     resetPlayer();
   }
 
@@ -235,8 +236,10 @@ function updateEnemy(dt, prevVy) {
       player.vy = -STOMP_BOUNCE;
       player.onGround = false;
       score += 200;
+      sfx(460, 0.1, "square", 0.06);
     } else {
       lives = Math.max(1, lives - 1);
+      sfx(140, 0.22, "sawtooth", 0.06);
       resetPlayer();
     }
   }
@@ -252,6 +255,7 @@ function updateStageItems() {
       c.taken = true;
       coins++;
       score += 100;
+      sfx(1180, 0.09, "square", 0.05);
     }
   }
 
@@ -261,6 +265,7 @@ function updateStageItems() {
       player.y < s.y * TILE + 32 && player.y + player.h > s.y * TILE + 12
     ) {
       lives = Math.max(1, lives - 1);
+      sfx(140, 0.22, "sawtooth", 0.06);
       resetPlayer();
       return;
     }
@@ -269,6 +274,7 @@ function updateStageItems() {
   const gx = Math.floor((player.x + player.w / 2) / TILE);
   const gy = Math.floor((player.y + player.h + 2) / TILE);
   if (grid[gy] && grid[gy][gx] === "=") {
+    if (!won) sfx(784, 0.22, "triangle", 0.07);
     won = true;
   }
 }
@@ -408,11 +414,13 @@ window.addEventListener("keydown", e => {
   if ((e.code === "Space" || e.code === "ArrowUp" || e.code === "KeyW") && player.onGround) {
     player.vy = -695;
     player.onGround = false;
+    sfx(350, 0.1, "square", 0.05);
   }
   if ((e.code === "ShiftLeft" || e.code === "ShiftRight" || e.code === "KeyK") && dashCooldown <= 0 && dashTimer <= 0) {
     dashTimer = 0.14;
     dashCooldown = 0.62;
     player.vy = 0;
+    sfx(480, 0.08, "triangle", 0.05);
   }
   if (e.code === "KeyM") muted = !muted;
   if ((e.code === "KeyN" || e.code === "Enter") && won) {

@@ -13,6 +13,7 @@
 <script>
 const c = document.getElementById("c"), ctx = c.getContext("2d");
 const ground = 360, grav = 1600;
+const plat = { x: 220, y: 270, w: 120, h: 18 };
 const p = { x: 60, y: ground - 24, w: 20, h: 24, speed: 220, vy: 0, grounded: true };
 const keys = {};
 
@@ -30,16 +31,25 @@ function loop() {
     p.vy = -620;
     p.grounded = false;
   }
+  const prevY = p.y;
   p.vy += grav * dt;
   p.y += p.vy * dt;
+  p.grounded = false;
+
   if (p.y >= ground - p.h) {
     p.y = ground - p.h;
+    p.vy = 0;
+    p.grounded = true;
+  }
+  if (p.vy >= 0 && prevY + p.h <= plat.y && p.y + p.h >= plat.y && p.x + p.w > plat.x && p.x < plat.x + plat.w) {
+    p.y = plat.y - p.h;
     p.vy = 0;
     p.grounded = true;
   }
 
   ctx.fillStyle = "#191a2e"; ctx.fillRect(0, 0, c.width, c.height);
   ctx.fillStyle = "#38b000"; ctx.fillRect(0, ground, c.width, c.height - ground);
+  ctx.fillStyle = "#b85d2b"; ctx.fillRect(plat.x, plat.y, plat.w, plat.h);
   ctx.fillStyle = "#e03131"; ctx.fillRect(p.x, p.y, p.w, p.h);
   requestAnimationFrame(loop);
 }

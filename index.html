@@ -27,6 +27,8 @@ let viewW = 800;
 let viewH = 450;
 let lives = 3;
 let score = 0;
+let coins = 0;
+let won = false;
 let camX = 0;
 let dashTimer = 0;
 let dashCooldown = 0;
@@ -49,6 +51,18 @@ const cols = 30;
 const grid = Array.from({ length: ROWS }, (_, r) =>
   Array.from({ length: cols }, (__, c) => (r >= 12 ? "G" : "."))
 );
+grid[12][14] = "."; grid[13][14] = ".";
+grid[12][15] = "."; grid[13][15] = ".";
+grid[9][18] = "#"; grid[9][19] = "#"; grid[9][20] = "#";
+grid[11][27] = "=";
+
+const coinList = [
+  { x: 7, y: 10, taken: false },
+  { x: 19, y: 7, taken: false }
+];
+const spikes = [
+  { x: 22, y: 11 }
+];
 
 const player = {
   x: 64,
@@ -75,7 +89,8 @@ const keys = { left: false, right: false };
 function isSolid(tx, ty) {
   if (tx < 0 || tx >= cols) return true;
   if (ty < 0 || ty >= ROWS) return false;
-  return grid[ty][tx] === "G";
+  const ch = grid[ty][tx];
+  return ch === "G" || ch === "#" || ch === "=";
 }
 
 function resetPlayer() {
@@ -166,9 +181,42 @@ function updateEnemy(dt, prevVy) {
   }
 }
 
+function updateStageItems() {
+  for (const c of coinList) {
+    if (c.taken) continue;
+    if (
+      player.x < c.x * TILE + 24 && player.x + player.w > c.x * TILE + 8 &&
+      player.y < c.y * TILE + 24 && player.y + player.h > c.y * TILE + 8
+    ) {
+      c.taken = true;
+      coins++;
+      score += 100;
+    }
+  }
+
+  for (const s of spikes) {
+    if (
+      player.x < s.x * TILE + 26 && player.x + player.w > s.x * TILE + 6 &&
+      player.y < s.y * TILE + 32 && player.y + player.h > s.y * TILE + 12
+    ) {
+      lives = Math.max(1, lives - 1);
+      resetPlayer();
+      return;
+    }
+  }
+
+  const gx = Math.floor((player.x + player.w / 2) / TILE);
+  const gy = Math.floor((player.y + player.h + 2) / TILE);
+  if (grid[gy] && grid[gy][gx] === "=") {
+    won = true;
+  }
+}
+
 function update(dt) {
+  if (won) return;
   const prevVy = updatePlayer(dt);
   updateEnemy(dt, prevVy);
+  updateStageItems();
 }
 
 function render() {
@@ -179,13 +227,37 @@ function render() {
   ctx.translate(-camX, viewH - ROWS * TILE);
   for (let y = 0; y < ROWS; y++) {
     for (let x = 0; x < cols; x++) {
-      if (grid[y][x] === "G") {
+      const ch = grid[y][x];
+      if (ch === "G") {
         ctx.fillStyle = "#8b542b";
         ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
         ctx.fillStyle = "#38b000";
         ctx.fillRect(x * TILE, y * TILE, TILE, 8);
+      } else if (ch === "#") {
+        ctx.fillStyle = "#b85d2b";
+        ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
+      } else if (ch === "=") {
+        ctx.fillStyle = "#f59e0b";
+        ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
       }
     }
+  }
+
+  for (const c of coinList) {
+    if (c.taken) continue;
+    ctx.fillStyle = "#ffd166";
+    ctx.beginPath();
+    ctx.arc(c.x * TILE + 16, c.y * TILE + 16, 8, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  for (const s of spikes) {
+    ctx.fillStyle = "#cbd5e1";
+    ctx.beginPath();
+    ctx.moveTo(s.x * TILE + 4, (s.y + 1) * TILE);
+    ctx.lineTo(s.x * TILE + 16, s.y * TILE + 12);
+    ctx.lineTo(s.x * TILE + 28, (s.y + 1) * TILE);
+    ctx.fill();
   }
 
   if (enemy.alive) {
@@ -199,7 +271,12 @@ function render() {
 
   ctx.fillStyle = "#fff";
   ctx.font = "bold 14px monospace";
-  ctx.fillText(`LIVES x${lives}  SCORE ${score}`, 14, 24);
+  ctx.fillText(`LIVES x${lives}  COINS x${coins}  SCORE ${score}`, 14, 24);
+  if (won) {
+    ctx.fillStyle = "#ffd166";
+    ctx.font = "bold 24px monospace";
+    ctx.fillText("STAGE CLEAR! Press R to replay", 14, 64);
+  }
 }
 
 window.addEventListener("keydown", e => {
@@ -214,6 +291,15 @@ window.addEventListener("keydown", e => {
     dashTimer = 0.14;
     dashCooldown = 0.62;
     player.vy = 0;
+  }
+  if (e.code === "KeyR") {
+    won = false;
+    lives = 3;
+    score = 0;
+    coins = 0;
+    enemy.alive = true;
+    coinList.forEach(c => (c.taken = false));
+    resetPlayer();
   }
 });
 window.addEventListener("keyup", e => {

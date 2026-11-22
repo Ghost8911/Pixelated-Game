@@ -32,6 +32,8 @@ let won = false;
 let camX = 0;
 let dashTimer = 0;
 let dashCooldown = 0;
+let coyoteTimer = 0;
+let jumpBuffer = 0;
 let walkTime = 0;
 let muted = false;
 let audioCtx = null;
@@ -139,6 +141,8 @@ function resetPlayer() {
   player.y = 8 * TILE;
   player.vx = 0;
   player.vy = 0;
+  coyoteTimer = 0;
+  jumpBuffer = 0;
   camX = 0;
 }
 
@@ -165,6 +169,18 @@ loadStage(0);
 function updatePlayer(dt) {
   const dir = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
   if (dir !== 0 && dashTimer <= 0) player.facing = dir;
+
+  if (player.onGround) coyoteTimer = 0.11;
+  else if (coyoteTimer > 0) coyoteTimer -= dt;
+  if (jumpBuffer > 0) jumpBuffer -= dt;
+
+  if (jumpBuffer > 0 && coyoteTimer > 0 && dashTimer <= 0) {
+    player.vy = -695;
+    player.onGround = false;
+    coyoteTimer = 0;
+    jumpBuffer = 0;
+    sfx(350, 0.1, "square", 0.05);
+  }
 
   if (dashCooldown > 0) dashCooldown -= dt;
   if (dashTimer > 0) {
@@ -199,10 +215,15 @@ function updatePlayer(dt) {
   const fx1 = Math.floor((player.x + player.w - 0.01) / TILE);
   for (let ty = fy0; ty <= fy1; ty++) {
     for (let tx = fx0; tx <= fx1; tx++) {
-      if (isSolid(tx, ty) && player.vy > 0) {
-        player.y = ty * TILE - player.h;
-        player.onGround = true;
-        player.vy = 0;
+      if (isSolid(tx, ty)) {
+        if (player.vy > 0) {
+          player.y = ty * TILE - player.h;
+          player.onGround = true;
+          player.vy = 0;
+        } else if (player.vy < 0) {
+          player.y = (ty + 1) * TILE;
+          player.vy = 0;
+        }
       }
     }
   }
@@ -411,10 +432,8 @@ window.addEventListener("keydown", e => {
   if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.code)) e.preventDefault();
   if (e.code === "ArrowLeft" || e.code === "KeyA") keys.left = true;
   if (e.code === "ArrowRight" || e.code === "KeyD") keys.right = true;
-  if ((e.code === "Space" || e.code === "ArrowUp" || e.code === "KeyW") && player.onGround) {
-    player.vy = -695;
-    player.onGround = false;
-    sfx(350, 0.1, "square", 0.05);
+  if (e.code === "Space" || e.code === "ArrowUp" || e.code === "KeyW") {
+    jumpBuffer = 0.12;
   }
   if ((e.code === "ShiftLeft" || e.code === "ShiftRight" || e.code === "KeyK") && dashCooldown <= 0 && dashTimer <= 0) {
     dashTimer = 0.14;

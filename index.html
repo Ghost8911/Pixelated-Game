@@ -22,6 +22,13 @@
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
+const TILE = 32;
+const ROWS = 14;
+const GRAVITY = 1750;
+const STOMP_BOUNCE = 490;
+const DASH_DURATION = 0.14;
+const DASH_COOLDOWN = 0.62;
+
 let viewW = 800;
 let viewH = 450;
 let clock = 0;
@@ -40,13 +47,9 @@ function fitScreen() {
 window.addEventListener("resize", fitScreen);
 fitScreen();
 
-const TILE = 32;
-const ROWS = 14;
-const GRAVITY = 1750;
-const DASH_DURATION = 0.14;
-const DASH_COOLDOWN = 0.62;
-
 let lives = 3;
+let score = 0;
+let coins = 0;
 let invulnTimer = 0;
 let dashTimer = 0;
 let dashCooldown = 0;
@@ -69,6 +72,17 @@ let player = {
   onGround: false,
   facing: 1
 };
+
+let items = [
+  { x: 6, y: 10, coin: true, taken: false },
+  { x: 8, y: 10, coin: true, taken: false }
+];
+let enemies = [
+  { x: 9 * TILE + 4, y: 12 * TILE - 26, w: 24, h: 26, vx: -60, vy: 0, alive: true }
+];
+let spikes = [
+  { x: 14, y: 11 }
+];
 
 const activeHero = { speed: 225, jump: 695, dash: 510 };
 const keys = { left: false, right: false };
@@ -95,7 +109,11 @@ function respawnInStage() {
 function hurtPlayer() {
   if (invulnTimer > 0 || dashTimer > 0) return;
   lives--;
-  if (lives <= 0) lives = 3;
+  if (lives <= 0) {
+    lives = 3;
+    score = 0;
+    coins = 0;
+  }
   respawnInStage();
 }
 
@@ -138,6 +156,7 @@ function movePlayer(dt) {
     }
   }
 
+  const prevVy = player.vy;
   player.y += player.vy * dt;
   player.onGround = false;
   x0 = Math.floor(player.x / TILE);
@@ -161,6 +180,63 @@ function movePlayer(dt) {
 
   if (player.y > ROWS * TILE + 20) hurtPlayer();
   camX = Math.max(0, Math.min(colsCount * TILE - viewW, player.x - viewW * 0.35));
+  return prevVy;
+}
+
+function stepEntities(dt, prevVy) {
+  for (const it of items) {
+    if (!it.coin || it.taken) continue;
+    if (
+      player.x < it.x * TILE + 26 && player.x + player.w > it.x * TILE + 6 &&
+      player.y < it.y * TILE + 26 && player.y + player.h > it.y * TILE + 6
+    ) {
+      it.taken = true;
+      coins++;
+      score += 100;
+    }
+  }
+
+  for (const sp of spikes) {
+    if (
+      player.x < sp.x * TILE + 26 && player.x + player.w > sp.x * TILE + 6 &&
+      player.y < sp.y * TILE + 32 && player.y + player.h > sp.y * TILE + 12
+    ) {
+      hurtPlayer();
+      return;
+    }
+  }
+
+  for (const e of enemies) {
+    if (!e.alive) continue;
+    e.vy = Math.min(900, e.vy + GRAVITY * dt);
+    e.x += e.vx * dt;
+    const aheadX = Math.floor((e.x + (e.vx > 0 ? e.w : 0)) / TILE);
+    const midY = Math.floor((e.y + e.h / 2) / TILE);
+    const belowY = Math.floor((e.y + e.h + 4) / TILE);
+    if (solidAt(aheadX, midY) || !solidAt(aheadX, belowY)) e.vx *= -1;
+
+    e.y += e.vy * dt;
+    const fy = Math.floor((e.y + e.h) / TILE);
+    const fx = Math.floor((e.x + e.w / 2) / TILE);
+    if (e.vy > 0 && solidAt(fx, fy)) { e.y = fy * TILE - e.h; e.vy = 0; }
+
+    if (
+      player.x < e.x + e.w && player.x + player.w > e.x &&
+      player.y < e.y + e.h && player.y + player.h > e.y
+    ) {
+      const stomping = prevVy > 0 && (player.y + player.h - prevVy * dt <= e.y + 12);
+      if (stomping) {
+        e.alive = false;
+        player.y = e.y - player.h - 1;
+        player.vy = -STOMP_BOUNCE;
+        player.onGround = false;
+        score += 200;
+      } else {
+        hurtPlayer();
+        return;
+      }
+    }
+  }
 }
 
 window.addEventListener("keydown", e => {
@@ -179,7 +255,8 @@ window.addEventListener("keyup", e => {
 
 function updateLoop(dt) {
   clock += dt;
-  movePlayer(dt);
+  const prevVy = movePlayer(dt);
+  stepEntities(dt, prevVy);
 }
 
 function renderLoop() {
@@ -198,13 +275,40 @@ function renderLoop() {
       }
     }
   }
+
+  for (const it of items) {
+    if (!it.coin || it.taken) continue;
+    ctx.fillStyle = "#ffd166";
+    ctx.beginPath();
+    ctx.arc(it.x * TILE + 16, it.y * TILE + 16, 8, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  for (const sp of spikes) {
+    ctx.fillStyle = "#cbd5e1";
+    ctx.beginPath();
+    ctx.moveTo(sp.x * TILE + 4, (sp.y + 1) * TILE);
+    ctx.lineTo(sp.x * TILE + 16, sp.y * TILE + 12);
+    ctx.lineTo(sp.x * TILE + 28, (sp.y + 1) * TILE);
+    ctx.fill();
+  }
+
+  for (const e of enemies) {
+    if (!e.alive) continue;
+    ctx.fillStyle = "#9e2a2b";
+    ctx.fillRect(e.x, e.y + 2, e.w, e.h - 4);
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(e.x + 5, e.y + 8, 4, 4);
+    ctx.fillRect(e.x + 15, e.y + 8, 4, 4);
+  }
+
   ctx.fillStyle = "#e03131";
   ctx.fillRect(player.x, player.y, player.w, player.h);
   ctx.restore();
 
   ctx.fillStyle = "#fff";
   ctx.font = "bold 14px monospace";
-  ctx.fillText(`LIVES x${lives}`, 14, 24);
+  ctx.fillText(`LIVES x${lives}  COINS x${coins}  SCORE ${score}`, 14, 24);
 }
 
 let prevTime = 0;

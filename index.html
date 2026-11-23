@@ -21,20 +21,19 @@ function burst(x, y, col) {
   for (let i = 0; i < 8; i++) sparks.push({ x, y, vx: (Math.random() - 0.5) * 240, vy: (Math.random() - 0.8) * 240, col, t: 0.3 });
 }
 const ground = 360;
-const plats = [
-  { x: 220, y: 270, w: 120, h: 18 },
-  { x: 380, y: 210, w: 110, h: 18, vx: 70, minX: 350, maxX: 520 },
-  { x: 560, y: 280, w: 110, h: 18 }
-];
-const coins = [{ x: 280, y: 235, r: 8, taken: false }, { x: 460, y: 175, r: 8, taken: false }, { x: 615, y: 245, r: 8, taken: false }];
-const pits = [{ x: 150, w: 60 }, { x: 350, w: 70 }];
-let score = 0;
-let lives = 3, dead = false;
+let plats = [], coins = [], pits = [];
 const foe = { x: 420, y: ground - 22, w: 22, h: 22, vx: -90, minX: 360, maxX: 540, alive: true };
 const goal = { x: 640, y: ground - 64, w: 6, h: 64 };
-let won = false;
-let camX = 0;
+let stage = 1, score = 0, lives = 3, dead = false, won = false, camX = 0;
 const p = { x: 60, y: ground - 24, w: 20, h: 24, vy: 0, grounded: true, jumps: 0, jumpHeld: false, coyote: 0, buf: 0 };
+function loadStage(n) {
+  stage = n; p.x = 60; p.y = ground - p.h; p.vy = 0; p.jumps = 0; p.coyote = 0; p.buf = 0; camX = 0;
+  plats = n === 1 ? [{ x: 220, y: 270, w: 120, h: 18 }, { x: 380, y: 210, w: 110, h: 18, vx: 70, minX: 350, maxX: 520 }, { x: 560, y: 280, w: 110, h: 18 }] : [{ x: 190, y: 265, w: 100, h: 18, vx: 85, minX: 170, maxX: 310 }, { x: 380, y: 200, w: 100, h: 18 }, { x: 540, y: 245, w: 110, h: 18, vx: -80, minX: 500, maxX: 670 }];
+  coins = n === 1 ? [{ x: 280, y: 235, r: 8, taken: false }, { x: 460, y: 175, r: 8, taken: false }, { x: 615, y: 245, r: 8, taken: false }] : [{ x: 240, y: 230, r: 8, taken: false }, { x: 430, y: 165, r: 8, taken: false }, { x: 595, y: 210, r: 8, taken: false }];
+  pits = n === 1 ? [{ x: 150, w: 60 }, { x: 350, w: 70 }] : [{ x: 130, w: 75 }, { x: 320, w: 80 }, { x: 490, w: 70 }];
+  foe.x = n === 1 ? 420 : 410; foe.vx = n === 1 ? -90 : -125; foe.minX = n === 1 ? 360 : 380; foe.maxX = n === 1 ? 540 : 480; foe.alive = true; goal.x = n === 1 ? 640 : 720;
+}
+loadStage(1);
 function hurt() {
   lives -= 1; sfx(160, 0.18, "sawtooth");
   if (lives <= 0) { lives = 0; dead = true; }
@@ -44,9 +43,7 @@ const keys = {};
 addEventListener("keydown", e => {
   keys[e.code] = true;
   if (e.code === "KeyR" && (won || dead)) {
-    p.x = 60; p.y = ground - p.h; p.vy = 0; p.jumps = 0; p.coyote = 0; p.buf = 0;
-    coins.forEach(cn => { cn.taken = false; }); foe.alive = true; foe.x = 420;
-    score = 0; lives = 3; won = false; dead = false; camX = 0;
+    score = 0; lives = 3; won = false; dead = false; loadStage(1);
   }
 });
 addEventListener("keyup", e => { keys[e.code] = false; });

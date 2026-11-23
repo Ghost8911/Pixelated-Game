@@ -19,6 +19,7 @@ function sfx(f, d = 0.09, t = "square") {
   o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime + d);
 }
 const sparks = [], trail = [];
+const stars = Array.from({ length: 36 }, (_, i) => ({ x: (i * 97) % 1400, y: 24 + ((i * 53) % 210), r: (i % 2) + 1 }));
 function burst(x, y, col) {
   for (let i = 0; i < 8; i++) sparks.push({ x, y, vx: (Math.random() - 0.5) * 240, vy: (Math.random() - 0.8) * 240, col, t: 0.3 });
 }
@@ -138,6 +139,13 @@ function draw() {
   }
 
   ctx.fillStyle = "#191a2e"; ctx.fillRect(0, 0, c.width, c.height);
+  ctx.fillStyle = "#f8f9fa";
+  for (const st of stars) ctx.fillRect(((st.x - camX * 0.15) % 1400 + 1400) % 1400, st.y, st.r, st.r);
+  ctx.fillStyle = "#222542";
+  for (let i = -1; i < 6; i++) {
+    const rx = i * 260 - ((camX * 0.35) % 260);
+    ctx.beginPath(); ctx.moveTo(rx, ground); ctx.lineTo(rx + 130, ground - 110); ctx.lineTo(rx + 260, ground); ctx.fill();
+  }
   ctx.save();
   const sx = shake > 0 ? (Math.random() - 0.5) * 10 * (shake / 0.22) : 0;
   const sy = shake > 0 ? (Math.random() - 0.5) * 10 * (shake / 0.22) : 0;

@@ -45,7 +45,9 @@ function draw() {
     p.grounded = false;
     p.vy += 1600 * (1 / 60);
     p.y += p.vy * (1 / 60);
-    if (p.y >= ground - p.h) { p.y = ground - p.h; p.vy = 0; p.grounded = true; }
+    const overPit = pits.some(pt => p.x + p.w > pt.x && p.x < pt.x + pt.w);
+    if (!overPit && p.y >= ground - p.h) { p.y = ground - p.h; p.vy = 0; p.grounded = true; }
+    if (p.y > c.height + 40) { p.x = 60; p.y = ground - p.h; p.vy = 0; }
     for (const pl of plats) {
       if (p.vy >= 0 && prevY + p.h <= pl.y && p.y + p.h >= pl.y && p.x + p.w > pl.x && p.x < pl.x + pl.w) {
         p.y = pl.y - p.h; p.vy = 0; p.grounded = true;

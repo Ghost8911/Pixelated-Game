@@ -32,7 +32,7 @@ let won = false;
 let camX = 0;
 const p = { x: 60, y: ground - 24, w: 20, h: 24, vy: 0, grounded: true, jumps: 0, jumpHeld: false };
 function hurt() {
-  lives -= 1;
+  lives -= 1; sfx(160, 0.18, "sawtooth");
   if (lives <= 0) { lives = 0; dead = true; }
   p.x = 60; p.y = ground - p.h; p.vy = 0; p.jumps = 0; camX = 0;
 }
@@ -55,7 +55,7 @@ function draw() {
     const dir = (keys.ArrowRight || keys.KeyD ? 1 : 0) - (keys.ArrowLeft || keys.KeyA ? 1 : 0);
     p.x = Math.max(0, p.x + dir * 220 * (1 / 60));
     const wantJump = keys.Space || keys.ArrowUp || keys.KeyW;
-    if (wantJump && !p.jumpHeld && p.jumps < 2) { p.vy = -620; p.grounded = false; p.jumps += 1; }
+    if (wantJump && !p.jumpHeld && p.jumps < 2) { p.vy = -620; p.grounded = false; p.jumps += 1; sfx(p.jumps === 1 ? 380 : 520); }
     p.jumpHeld = wantJump;
     const prevY = p.y;
     p.grounded = false;
@@ -71,7 +71,7 @@ function draw() {
     }
     for (const cn of coins) {
       if (!cn.taken && Math.hypot(p.x + p.w / 2 - cn.x, p.y + p.h / 2 - cn.y) < cn.r + 14) {
-        cn.taken = true; score += 100;
+        cn.taken = true; score += 100; sfx(780, 0.07, "triangle");
       }
     }
     if (foe.alive) {
@@ -81,14 +81,14 @@ function draw() {
       const hitY = p.y + p.h > foe.y && p.y < foe.y + foe.h;
       if (hitX && hitY) {
         if (p.vy > 0 && prevY + p.h <= foe.y + 8) {
-          foe.alive = false; p.vy = -420; p.jumps = 1; score += 200;
+          foe.alive = false; p.vy = -420; p.jumps = 1; score += 200; sfx(290, 0.1, "square");
         } else {
           hurt();
         }
       }
     }
     if (p.x + p.w > goal.x && p.x < goal.x + goal.w && p.y + p.h > goal.y) {
-      won = true; score += 500;
+      won = true; score += 500; sfx(660, 0.2, "triangle");
     }
     camX = Math.max(0, p.x - c.width * 0.35);
   }

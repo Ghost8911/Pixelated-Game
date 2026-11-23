@@ -82,8 +82,12 @@ function draw() {
   ctx.translate(-camX, 0);
 
   ctx.fillStyle = "#38b000"; ctx.fillRect(0, ground, 1200, c.height - ground);
+  ctx.fillStyle = "#191a2e";
+  for (const pt of pits) ctx.fillRect(pt.x, ground, pt.w, c.height - ground);
   ctx.fillStyle = "#b85d2b";
   for (const pl of plats) ctx.fillRect(pl.x, pl.y, pl.w, pl.h);
+  ctx.fillStyle = "#ffd166";
+  for (const cn of coins) if (!cn.taken) { ctx.beginPath(); ctx.arc(cn.x, cn.y, cn.r, 0, Math.PI * 2); ctx.fill(); }
   ctx.fillStyle = "#e9ecef"; ctx.fillRect(goal.x, goal.y, goal.w, goal.h);
   ctx.fillStyle = "#2ec4b6"; ctx.fillRect(goal.x + goal.w, goal.y, 24, 16);
   if (foe.alive) { ctx.fillStyle = "#9c36b5"; ctx.fillRect(foe.x, foe.y, foe.w, foe.h); }

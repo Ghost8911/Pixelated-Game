@@ -98,7 +98,8 @@ function draw() {
       }
     }
     if (p.x + p.w > goal.x && p.x < goal.x + goal.w && p.y + p.h > goal.y) {
-      won = true; score += 500; sfx(660, 0.2, "triangle");
+      score += 500; sfx(660, 0.2, "triangle");
+      if (stage < 2) loadStage(stage + 1); else won = true;
     }
     camX = Math.max(0, p.x - c.width * 0.35);
   }
@@ -126,10 +127,10 @@ function draw() {
 
   ctx.restore();
   ctx.fillStyle = "#fff"; ctx.font = "bold 15px monospace";
-  ctx.fillText(`SCORE ${score}   LIVES ${lives}`, 16, 28);
+  ctx.fillText(`STAGE ${stage}   SCORE ${score}   LIVES ${lives}`, 16, 28);
   if (won) {
     ctx.fillStyle = "#ffd166"; ctx.font = "bold 24px monospace";
-    ctx.fillText("STAGE CLEAR! PRESS R", 180, 170);
+    ctx.fillText("YOU BEAT ZEPHRYS! PRESS R", 160, 170);
   }
   if (dead) {
     ctx.fillStyle = "#ff4d6d"; ctx.font = "bold 24px monospace";

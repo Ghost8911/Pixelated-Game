@@ -9,7 +9,9 @@
   <script>
 const c = document.getElementById("c"), ctx = c.getContext("2d");
 const ac = new (window.AudioContext || window.webkitAudioContext)();
+let muted = false;
 function sfx(f, d = 0.09, t = "square") {
+  if (muted) return;
   if (ac.state === "suspended") ac.resume();
   const o = ac.createOscillator(), g = ac.createGain();
   o.type = t; o.frequency.value = f; g.gain.setValueAtTime(0.08, ac.currentTime);
@@ -42,6 +44,7 @@ function hurt() {
 const keys = {};
 addEventListener("keydown", e => {
   keys[e.code] = true;
+  if (e.code === "KeyM") muted = !muted;
   if (e.code === "KeyR" && (won || dead)) {
     score = 0; lives = 3; won = false; dead = false; loadStage(1);
   }
@@ -133,7 +136,7 @@ function draw() {
 
   ctx.restore();
   ctx.fillStyle = "#fff"; ctx.font = "bold 15px monospace";
-  ctx.fillText(`STAGE ${stage}   SCORE ${score}   BEST ${best}   LIVES ${lives}`, 16, 28);
+  ctx.fillText(`STAGE ${stage}   SCORE ${score}   BEST ${best}   LIVES ${lives}   ${muted ? "MUTED" : "SFX"} [M]`, 16, 28);
   if (won) {
     ctx.fillStyle = "#ffd166"; ctx.font = "bold 24px monospace";
     ctx.fillText("YOU BEAT ZEPHRYS! PRESS R", 160, 170);

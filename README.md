@@ -9,9 +9,9 @@ Hey, this is a game I made called **Zephrys**.
 ## Controls
 - **Move:** `A` / `D` or `ArrowLeft` / `ArrowRight`
 - **Jump:** `W` / `Space` / `ArrowUp`
-- **Dash:** `Shift` or `K`
+- **Dash:** `Shift` or `X`
 - **Mute SFX:** `M`
-- **Pause:** `Q`
+- **Pause:** `P`
 - **Reset:** `R`
 
 ## Play

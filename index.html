@@ -26,6 +26,7 @@ const ground = 360;
 let plats = [], coins = [], pits = [];
 const heart = { x: 430, y: 170, r: 9, taken: false };
 const foe = { x: 420, y: ground - 22, w: 22, h: 22, vx: -90, minX: 360, maxX: 540, alive: true };
+const foe2 = { x: 570, y: ground - 22, w: 22, h: 22, vx: 95, minX: 550, maxX: 630, alive: true };
 const goal = { x: 640, y: ground - 64, w: 6, h: 64 };
 let stage = 1, score = 0, best = Number(localStorage.getItem("zephrys_best") || 0), lives = 3, dead = false, won = false, paused = false, camX = 0, shake = 0;
 const p = { x: 60, y: ground - 24, w: 20, h: 24, vy: 0, grounded: true, jumps: 0, jumpHeld: false, coyote: 0, buf: 0, invuln: 0, facing: 1, dash: 0, dashCd: 0, dashHeld: false };
@@ -35,13 +36,28 @@ function loadStage(n) {
   coins = n === 1 ? [{ x: 280, y: 235, r: 8, taken: false }, { x: 460, y: 175, r: 8, taken: false }, { x: 615, y: 245, r: 8, taken: false }] : n === 2 ? [{ x: 240, y: 230, r: 8, taken: false }, { x: 430, y: 165, r: 8, taken: false }, { x: 595, y: 210, r: 8, taken: false }] : [{ x: 230, y: 220, r: 8, taken: false }, { x: 410, y: 155, r: 8, taken: false }, { x: 570, y: 180, r: 8, taken: false }, { x: 750, y: 235, r: 8, taken: false }];
   pits = n === 1 ? [{ x: 150, w: 60 }, { x: 350, w: 70 }] : n === 2 ? [{ x: 130, w: 75 }, { x: 320, w: 80 }, { x: 490, w: 70 }] : [{ x: 130, w: 85 }, { x: 310, w: 95 }, { x: 490, w: 95 }, { x: 650, w: 80 }];
   heart.x = n === 1 ? 430 : n === 2 ? 240 : 410; heart.y = n === 1 ? 170 : n === 2 ? 195 : 130; heart.taken = false;
-  foe.x = n === 1 ? 420 : n === 2 ? 410 : 720; foe.vx = n === 1 ? -90 : n === 2 ? -125 : -150; foe.minX = n === 1 ? 360 : n === 2 ? 380 : 690; foe.maxX = n === 1 ? 540 : n === 2 ? 480 : 810; foe.alive = true; goal.x = n === 1 ? 640 : n === 2 ? 720 : 830;
+  foe.x = n === 1 ? 420 : n === 2 ? 410 : 540; foe.vx = n === 1 ? -90 : n === 2 ? -125 : -130; foe.minX = n === 1 ? 360 : n === 2 ? 380 : 490; foe.maxX = n === 1 ? 540 : n === 2 ? 480 : 640; foe.alive = true;
+  foe2.x = n === 1 ? 570 : n === 2 ? 560 : 720; foe2.vx = n === 1 ? 95 : n === 2 ? -115 : -150; foe2.minX = n === 1 ? 550 : n === 2 ? 500 : 690; foe2.maxX = n === 1 ? 630 : n === 2 ? 670 : 810; foe2.alive = true;
+  goal.x = n === 1 ? 640 : n === 2 ? 720 : 830;
 }
 loadStage(1);
 function hurt() {
   lives -= 1; p.invuln = 1.2; shake = 0.22; sfx(160, 0.18, "sawtooth");
   if (lives <= 0) { lives = 0; dead = true; }
   p.x = 60; p.y = ground - p.h; p.vy = 0; p.jumps = 0; p.coyote = 0; p.buf = 0; p.dash = 0; p.dashCd = 0; camX = 0;
+}
+function hitEnemy(en, prevY) {
+  en.x += en.vx * (1 / 60);
+  if (en.x <= en.minX || en.x + en.w >= en.maxX) en.vx *= -1;
+  const hitX = p.x + p.w > en.x && p.x < en.x + en.w;
+  const hitY = p.y + p.h > en.y && p.y < en.y + en.h;
+  if (hitX && hitY) {
+    if ((p.vy > 0 && prevY + p.h <= en.y + 8) || p.dash > 0) {
+      en.alive = false; p.vy = -360; p.jumps = 1; p.dash = 0; shake = 0.12; score += 250; sfx(340, 0.12, "square"); burst(en.x + en.w / 2, en.y + en.h / 2, "#9c36b5");
+    } else if (p.invuln <= 0) {
+      hurt();
+    }
+  }
 }
 const keys = {};
 addEventListener("keydown", e => {
@@ -106,19 +122,8 @@ function draw() {
     if (!heart.taken && Math.hypot(p.x + p.w / 2 - heart.x, p.y + p.h / 2 - heart.y) < heart.r + 14) {
       heart.taken = true; lives = Math.min(5, lives + 1); score += 150; sfx(880, 0.12, "triangle"); burst(heart.x, heart.y, "#ff4d6d");
     }
-    if (foe.alive) {
-      foe.x += foe.vx * (1 / 60);
-      if (foe.x <= foe.minX || foe.x + foe.w >= foe.maxX) foe.vx *= -1;
-      const hitX = p.x + p.w > foe.x && p.x < foe.x + foe.w;
-      const hitY = p.y + p.h > foe.y && p.y < foe.y + foe.h;
-      if (hitX && hitY) {
-        if ((p.vy > 0 && prevY + p.h <= foe.y + 8) || p.dash > 0) {
-          foe.alive = false; p.vy = -360; p.jumps = 1; p.dash = 0; shake = 0.12; score += 250; sfx(340, 0.12, "square"); burst(foe.x + foe.w / 2, foe.y + foe.h / 2, "#9c36b5");
-        } else if (p.invuln <= 0) {
-          hurt();
-        }
-      }
-    }
+    if (foe.alive) hitEnemy(foe, prevY);
+    if (foe2.alive) hitEnemy(foe2, prevY);
     if (p.x + p.w > goal.x && p.x < goal.x + goal.w && p.y + p.h > goal.y) {
       score += 500; sfx(660, 0.2, "triangle");
       if (stage < 3) loadStage(stage + 1); else won = true;
@@ -149,6 +154,7 @@ function draw() {
   ctx.fillStyle = "#e9ecef"; ctx.fillRect(goal.x, goal.y, goal.w, goal.h);
   ctx.fillStyle = "#2ec4b6"; ctx.fillRect(goal.x + goal.w, goal.y, 24, 16);
   if (foe.alive) { ctx.fillStyle = "#9c36b5"; ctx.fillRect(foe.x, foe.y, foe.w, foe.h); }
+  if (foe2.alive) { ctx.fillStyle = "#be4bdb"; ctx.fillRect(foe2.x, foe2.y, foe2.w, foe2.h); }
   for (const g of trail) { ctx.fillStyle = `rgba(224,49,49,${g.a})`; ctx.fillRect(g.x, g.y, g.w, g.h); }
   if (p.invuln <= 0 || Math.floor(p.invuln * 16) % 2 === 0) { ctx.fillStyle = "#e03131"; ctx.fillRect(p.x, p.y, p.w, p.h); }
   for (const s of sparks) { ctx.fillStyle = s.col; ctx.fillRect(s.x - 2, s.y - 2, 4, 4); }

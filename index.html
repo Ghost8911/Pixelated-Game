@@ -26,13 +26,13 @@ const p = { x: 60, y: ground - 24, w: 20, h: 24, vy: 0, grounded: true, jumps: 0
 function hurt() {
   lives -= 1;
   if (lives <= 0) { lives = 0; dead = true; }
-  p.x = 60; p.y = ground - p.h; p.vy = 0; camX = 0;
+  p.x = 60; p.y = ground - p.h; p.vy = 0; p.jumps = 0; camX = 0;
 }
 const keys = {};
 addEventListener("keydown", e => {
   keys[e.code] = true;
   if (e.code === "KeyR" && (won || dead)) {
-    p.x = 60; p.y = ground - p.h; p.vy = 0;
+    p.x = 60; p.y = ground - p.h; p.vy = 0; p.jumps = 0;
     coins.forEach(cn => { cn.taken = false; }); foe.alive = true; foe.x = 420;
     score = 0; lives = 3; won = false; dead = false; camX = 0;
   }
@@ -46,17 +46,19 @@ function draw() {
   if (!won && !dead) {
     const dir = (keys.ArrowRight || keys.KeyD ? 1 : 0) - (keys.ArrowLeft || keys.KeyA ? 1 : 0);
     p.x = Math.max(0, p.x + dir * 220 * (1 / 60));
-    if ((keys.Space || keys.ArrowUp || keys.KeyW) && p.grounded) { p.vy = -620; p.grounded = false; }
+    const wantJump = keys.Space || keys.ArrowUp || keys.KeyW;
+    if (wantJump && !p.jumpHeld && p.jumps < 2) { p.vy = -620; p.grounded = false; p.jumps += 1; }
+    p.jumpHeld = wantJump;
     const prevY = p.y;
     p.grounded = false;
     p.vy += 1600 * (1 / 60);
     p.y += p.vy * (1 / 60);
     const overPit = pits.some(pt => p.x + p.w > pt.x && p.x < pt.x + pt.w);
-    if (!overPit && p.y >= ground - p.h) { p.y = ground - p.h; p.vy = 0; p.grounded = true; }
+    if (!overPit && p.y >= ground - p.h) { p.y = ground - p.h; p.vy = 0; p.grounded = true; p.jumps = 0; }
     if (p.y > c.height + 40) hurt();
     for (const pl of plats) {
       if (p.vy >= 0 && prevY + p.h <= pl.y && p.y + p.h >= pl.y && p.x + p.w > pl.x && p.x < pl.x + pl.w) {
-        p.y = pl.y - p.h; p.vy = 0; p.grounded = true;
+        p.y = pl.y - p.h; p.vy = 0; p.grounded = true; p.jumps = 0;
       }
     }
     for (const cn of coins) {
@@ -71,7 +73,7 @@ function draw() {
       const hitY = p.y + p.h > foe.y && p.y < foe.y + foe.h;
       if (hitX && hitY) {
         if (p.vy > 0 && prevY + p.h <= foe.y + 8) {
-          foe.alive = false; p.vy = -420; score += 200;
+          foe.alive = false; p.vy = -420; p.jumps = 1; score += 200;
         } else {
           hurt();
         }

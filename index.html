@@ -31,7 +31,7 @@ let stage = 1, score = 0, best = Number(localStorage.getItem("zephrys_best") || 
 const p = { x: 60, y: ground - 24, w: 20, h: 24, vy: 0, grounded: true, jumps: 0, jumpHeld: false, coyote: 0, buf: 0, invuln: 0, facing: 1, dash: 0, dashCd: 0, dashHeld: false };
 function loadStage(n) {
   stage = n; p.x = 60; p.y = ground - p.h; p.vy = 0; p.jumps = 0; p.coyote = 0; p.buf = 0; p.invuln = 0; p.facing = 1; p.dash = 0; p.dashCd = 0; camX = 0;
-  plats = n === 1 ? [{ x: 220, y: 270, w: 120, h: 18 }, { x: 380, y: 210, w: 110, h: 18, vx: 70, minX: 350, maxX: 520 }, { x: 560, y: 280, w: 110, h: 18 }] : [{ x: 190, y: 265, w: 100, h: 18, vx: 85, minX: 170, maxX: 310 }, { x: 380, y: 200, w: 100, h: 18 }, { x: 540, y: 245, w: 110, h: 18, vx: -80, minX: 500, maxX: 670 }];
+  plats = n === 1 ? [{ x: 220, y: 270, w: 120, h: 18 }, { x: 380, y: 210, w: 110, h: 18, vx: 70, minX: 350, maxX: 520 }, { x: 560, y: 280, w: 110, h: 18, vy: -55, minY: 190, maxY: 300 }] : [{ x: 190, y: 265, w: 100, h: 18, vx: 85, minX: 170, maxX: 310 }, { x: 380, y: 210, w: 100, h: 18, vy: 65, minY: 165, maxY: 285 }, { x: 540, y: 245, w: 110, h: 18, vx: -80, minX: 500, maxX: 670 }];
   coins = n === 1 ? [{ x: 280, y: 235, r: 8, taken: false }, { x: 460, y: 175, r: 8, taken: false }, { x: 615, y: 245, r: 8, taken: false }] : [{ x: 240, y: 230, r: 8, taken: false }, { x: 430, y: 165, r: 8, taken: false }, { x: 595, y: 210, r: 8, taken: false }];
   pits = n === 1 ? [{ x: 150, w: 60 }, { x: 350, w: 70 }] : [{ x: 130, w: 75 }, { x: 320, w: 80 }, { x: 490, w: 70 }];
   heart.x = n === 1 ? 430 : 240; heart.y = n === 1 ? 170 : 195; heart.taken = false;
@@ -61,10 +61,17 @@ function draw() {
   if (!won && !dead && !paused) {
     p.invuln = Math.max(0, p.invuln - 1 / 60); p.dash = Math.max(0, p.dash - 1 / 60); p.dashCd = Math.max(0, p.dashCd - 1 / 60);
     for (const pl of plats) {
-      if (!pl.vx) continue;
-      const dx = pl.vx * (1 / 60); pl.x += dx;
-      if (pl.x <= pl.minX || pl.x + pl.w >= pl.maxX) pl.vx *= -1;
-      if (p.grounded && Math.abs(p.y + p.h - pl.y) < 2 && p.x + p.w > pl.x && p.x < pl.x + pl.w) p.x += dx;
+      const riding = p.grounded && Math.abs(p.y + p.h - pl.y) < 3 && p.x + p.w > pl.x && p.x < pl.x + pl.w;
+      if (pl.vx) {
+        const dx = pl.vx * (1 / 60); pl.x += dx;
+        if (pl.x <= pl.minX || pl.x + pl.w >= pl.maxX) pl.vx *= -1;
+        if (riding) p.x += dx;
+      }
+      if (pl.vy) {
+        const dy = pl.vy * (1 / 60); pl.y += dy;
+        if (pl.y <= pl.minY || pl.y >= pl.maxY) pl.vy *= -1;
+        if (riding) p.y += dy;
+      }
     }
     const dir = (keys.ArrowRight || keys.KeyD ? 1 : 0) - (keys.ArrowLeft || keys.KeyA ? 1 : 0);
     if (dir) p.facing = dir;
@@ -86,7 +93,7 @@ function draw() {
     if (!overPit && p.y >= ground - p.h) { p.y = ground - p.h; p.vy = 0; p.grounded = true; p.jumps = 0; }
     if (p.y > c.height + 40) hurt();
     for (const pl of plats) {
-      if (p.vy >= 0 && prevY + p.h <= pl.y && p.y + p.h >= pl.y && p.x + p.w > pl.x && p.x < pl.x + pl.w) {
+      if (p.vy >= 0 && prevY + p.h <= pl.y + 6 && p.y + p.h >= pl.y && p.x + p.w > pl.x && p.x < pl.x + pl.w) {
         p.y = pl.y - p.h; p.vy = 0; p.grounded = true; p.jumps = 0;
       }
     }

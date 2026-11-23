@@ -17,6 +17,7 @@ const plats = [
 const coins = [{ x: 280, y: 235, r: 8, taken: false }, { x: 460, y: 175, r: 8, taken: false }, { x: 615, y: 245, r: 8, taken: false }];
 const pits = [{ x: 150, w: 60 }, { x: 350, w: 70 }];
 let score = 0;
+let lives = 3, dead = false;
 const foe = { x: 420, y: ground - 22, w: 22, h: 22, vx: -90, minX: 360, maxX: 540, alive: true };
 const goal = { x: 640, y: ground - 64, w: 6, h: 64 };
 let won = false;
@@ -25,10 +26,10 @@ const p = { x: 60, y: ground - 24, w: 20, h: 24, vy: 0, grounded: true };
 const keys = {};
 addEventListener("keydown", e => {
   keys[e.code] = true;
-  if (e.code === "KeyR" && won) {
+  if (e.code === "KeyR" && (won || dead)) {
     p.x = 60; p.y = ground - p.h; p.vy = 0;
     coins.forEach(cn => { cn.taken = false; }); foe.alive = true; foe.x = 420;
-    score = 0; won = false; camX = 0;
+    score = 0; lives = 3; won = false; dead = false; camX = 0;
   }
 });
 addEventListener("keyup", e => { keys[e.code] = false; });

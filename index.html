@@ -26,7 +26,7 @@ const ground = 360;
 let plats = [], coins = [], pits = [];
 const foe = { x: 420, y: ground - 22, w: 22, h: 22, vx: -90, minX: 360, maxX: 540, alive: true };
 const goal = { x: 640, y: ground - 64, w: 6, h: 64 };
-let stage = 1, score = 0, best = Number(localStorage.getItem("zephrys_best") || 0), lives = 3, dead = false, won = false, camX = 0;
+let stage = 1, score = 0, best = Number(localStorage.getItem("zephrys_best") || 0), lives = 3, dead = false, won = false, paused = false, camX = 0;
 const p = { x: 60, y: ground - 24, w: 20, h: 24, vy: 0, grounded: true, jumps: 0, jumpHeld: false, coyote: 0, buf: 0, invuln: 0, facing: 1, dash: 0, dashCd: 0, dashHeld: false };
 function loadStage(n) {
   stage = n; p.x = 60; p.y = ground - p.h; p.vy = 0; p.jumps = 0; p.coyote = 0; p.buf = 0; p.invuln = 0; p.facing = 1; p.dash = 0; p.dashCd = 0; camX = 0;
@@ -45,8 +45,9 @@ const keys = {};
 addEventListener("keydown", e => {
   keys[e.code] = true;
   if (e.code === "KeyM") muted = !muted;
+  if (e.code === "KeyP" && !won && !dead) paused = !paused;
   if (e.code === "KeyR" && (won || dead)) {
-    score = 0; lives = 3; won = false; dead = false; loadStage(1);
+    score = 0; lives = 3; won = false; dead = false; paused = false; loadStage(1);
   }
 });
 addEventListener("keyup", e => { keys[e.code] = false; });
@@ -55,7 +56,7 @@ addEventListener("resize", resize);
 resize();
 
 function draw() {
-  if (!won && !dead) {
+  if (!won && !dead && !paused) {
     p.invuln = Math.max(0, p.invuln - 1 / 60); p.dash = Math.max(0, p.dash - 1 / 60); p.dashCd = Math.max(0, p.dashCd - 1 / 60);
     for (const pl of plats) {
       if (!pl.vx) continue;
@@ -98,8 +99,8 @@ function draw() {
       const hitX = p.x + p.w > foe.x && p.x < foe.x + foe.w;
       const hitY = p.y + p.h > foe.y && p.y < foe.y + foe.h;
       if (hitX && hitY) {
-        if ((p.vy > 0 && prevY + p.h <= foe.y + 8) || p.dash > 0) {
-          foe.alive = false; p.vy = -360; p.jumps = 1; p.dash = 0; score += 250; sfx(340, 0.12, "square"); burst(foe.x + foe.w / 2, foe.y + foe.h / 2, "#9c36b5");
+        if (p.vy > 0 && prevY + p.h <= foe.y + 8) {
+          foe.alive = false; p.vy = -360; p.jumps = 1; score += 250; sfx(340, 0.12, "square"); burst(foe.x + foe.w / 2, foe.y + foe.h / 2, "#9c36b5");
         } else if (p.invuln <= 0) {
           hurt();
         }
@@ -111,10 +112,10 @@ function draw() {
     }
     if (score > best) { best = score; localStorage.setItem("zephrys_best", best); }
     camX = Math.max(0, p.x - c.width * 0.35);
-  }
-  for (let i = sparks.length - 1; i >= 0; i--) {
-    const s = sparks[i]; s.x += s.vx * (1 / 60); s.y += s.vy * (1 / 60); s.vy += 600 * (1 / 60); s.t -= 1 / 60;
-    if (s.t <= 0) sparks.splice(i, 1);
+    for (let i = sparks.length - 1; i >= 0; i--) {
+      const s = sparks[i]; s.x += s.vx * (1 / 60); s.y += s.vy * (1 / 60); s.vy += 600 * (1 / 60); s.t -= 1 / 60;
+      if (s.t <= 0) sparks.splice(i, 1);
+    }
   }
 
   ctx.fillStyle = "#191a2e"; ctx.fillRect(0, 0, c.width, c.height);
@@ -136,7 +137,11 @@ function draw() {
 
   ctx.restore();
   ctx.fillStyle = "#fff"; ctx.font = "bold 15px monospace";
-  ctx.fillText(`STAGE ${stage}   SCORE ${score}   BEST ${best}   LIVES ${lives}   ${muted ? "MUTED" : "SFX"} [M]`, 16, 28);
+  ctx.fillText(`STAGE ${stage}   SCORE ${score}   BEST ${best}   LIVES ${lives}   ${muted ? "MUTED" : "SFX"} [M]   [P] PAUSE`, 16, 28);
+  if (paused) {
+    ctx.fillStyle = "#74c0fc"; ctx.font = "bold 24px monospace";
+    ctx.fillText("PAUSED! PRESS P", 195, 170);
+  }
   if (won) {
     ctx.fillStyle = "#ffd166"; ctx.font = "bold 24px monospace";
     ctx.fillText("YOU BEAT ZEPHRYS! PRESS R", 160, 170);

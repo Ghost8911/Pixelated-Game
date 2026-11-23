@@ -7,6 +7,20 @@
 <body style="margin:0;overflow:hidden;background:#191a2e">
   <canvas id="c"></canvas>
   <script>
+const c = document.getElementById("c"), ctx = c.getContext("2d");
+const ground = 360;
+const p = { x: 60, y: ground - 24, w: 20, h: 24 };
+function resize() { c.width = innerWidth; c.height = innerHeight; }
+addEventListener("resize", resize);
+resize();
+
+function draw() {
+  ctx.fillStyle = "#191a2e"; ctx.fillRect(0, 0, c.width, c.height);
+  ctx.fillStyle = "#38b000"; ctx.fillRect(0, ground, c.width, c.height - ground);
+  ctx.fillStyle = "#e03131"; ctx.fillRect(p.x, p.y, p.w, p.h);
+  requestAnimationFrame(draw);
+}
+
   </script>
 </body>
 </html>

@@ -53,6 +53,11 @@ function draw() {
         p.y = pl.y - p.h; p.vy = 0; p.grounded = true;
       }
     }
+    for (const cn of coins) {
+      if (!cn.taken && Math.hypot(p.x + p.w / 2 - cn.x, p.y + p.h / 2 - cn.y) < cn.r + 14) {
+        cn.taken = true; score += 100;
+      }
+    }
     if (foe.alive) {
       foe.x += foe.vx * (1 / 60);
       if (foe.x <= foe.minX || foe.x + foe.w >= foe.maxX) foe.vx *= -1;

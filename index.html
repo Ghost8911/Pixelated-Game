@@ -56,6 +56,12 @@ resize();
 
 function draw() {
   if (!won && !dead) {
+    for (const pl of plats) {
+      if (!pl.vx) continue;
+      const dx = pl.vx * (1 / 60); pl.x += dx;
+      if (pl.x <= pl.minX || pl.x + pl.w >= pl.maxX) pl.vx *= -1;
+      if (p.grounded && Math.abs(p.y + p.h - pl.y) < 2 && p.x + p.w > pl.x && p.x < pl.x + pl.w) p.x += dx;
+    }
     const dir = (keys.ArrowRight || keys.KeyD ? 1 : 0) - (keys.ArrowLeft || keys.KeyA ? 1 : 0);
     p.x = Math.max(0, p.x + dir * 220 * (1 / 60));
     const wantJump = keys.Space || keys.ArrowUp || keys.KeyW;

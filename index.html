@@ -8,6 +8,14 @@
   <canvas id="c"></canvas>
   <script>
 const c = document.getElementById("c"), ctx = c.getContext("2d");
+const ac = new (window.AudioContext || window.webkitAudioContext)();
+function sfx(f, d = 0.09, t = "square") {
+  if (ac.state === "suspended") ac.resume();
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.type = t; o.frequency.value = f; g.gain.setValueAtTime(0.08, ac.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + d);
+  o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime + d);
+}
 const ground = 360;
 const plats = [
   { x: 220, y: 270, w: 120, h: 18 },

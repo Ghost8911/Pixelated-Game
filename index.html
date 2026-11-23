@@ -67,7 +67,8 @@ function draw() {
     p.coyote = p.grounded ? 0.1 : Math.max(0, p.coyote - 1 / 60);
     p.buf = Math.max(0, p.buf - 1 / 60);
     const wantJump = keys.Space || keys.ArrowUp || keys.KeyW;
-    if (wantJump && !p.jumpHeld && p.jumps < 2) { p.vy = -620; p.grounded = false; p.jumps += 1; sfx(p.jumps === 1 ? 380 : 520); if (p.jumps === 2) burst(p.x + p.w / 2, p.y + p.h, "#74c0fc"); }
+    if (wantJump && !p.jumpHeld) p.buf = 0.12;
+    if (p.buf > 0 && (p.coyote > 0 || (p.jumps > 0 && p.jumps < 2))) { p.vy = -620; p.grounded = false; p.coyote = 0; p.buf = 0; p.jumps += 1; sfx(p.jumps === 1 ? 380 : 520); if (p.jumps === 2) burst(p.x + p.w / 2, p.y + p.h, "#74c0fc"); }
     p.jumpHeld = wantJump;
     const prevY = p.y;
     p.grounded = false;

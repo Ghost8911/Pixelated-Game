@@ -34,17 +34,17 @@ const foe = { x: 420, y: ground - 22, w: 22, h: 22, vx: -90, minX: 360, maxX: 54
 const goal = { x: 640, y: ground - 64, w: 6, h: 64 };
 let won = false;
 let camX = 0;
-const p = { x: 60, y: ground - 24, w: 20, h: 24, vy: 0, grounded: true, jumps: 0, jumpHeld: false };
+const p = { x: 60, y: ground - 24, w: 20, h: 24, vy: 0, grounded: true, jumps: 0, jumpHeld: false, coyote: 0, buf: 0 };
 function hurt() {
   lives -= 1; sfx(160, 0.18, "sawtooth");
   if (lives <= 0) { lives = 0; dead = true; }
-  p.x = 60; p.y = ground - p.h; p.vy = 0; p.jumps = 0; camX = 0;
+  p.x = 60; p.y = ground - p.h; p.vy = 0; p.jumps = 0; p.coyote = 0; p.buf = 0; camX = 0;
 }
 const keys = {};
 addEventListener("keydown", e => {
   keys[e.code] = true;
   if (e.code === "KeyR" && (won || dead)) {
-    p.x = 60; p.y = ground - p.h; p.vy = 0; p.jumps = 0;
+    p.x = 60; p.y = ground - p.h; p.vy = 0; p.jumps = 0; p.coyote = 0; p.buf = 0;
     coins.forEach(cn => { cn.taken = false; }); foe.alive = true; foe.x = 420;
     score = 0; lives = 3; won = false; dead = false; camX = 0;
   }
@@ -64,6 +64,8 @@ function draw() {
     }
     const dir = (keys.ArrowRight || keys.KeyD ? 1 : 0) - (keys.ArrowLeft || keys.KeyA ? 1 : 0);
     p.x = Math.max(0, p.x + dir * 220 * (1 / 60));
+    p.coyote = p.grounded ? 0.1 : Math.max(0, p.coyote - 1 / 60);
+    p.buf = Math.max(0, p.buf - 1 / 60);
     const wantJump = keys.Space || keys.ArrowUp || keys.KeyW;
     if (wantJump && !p.jumpHeld && p.jumps < 2) { p.vy = -620; p.grounded = false; p.jumps += 1; sfx(p.jumps === 1 ? 380 : 520); if (p.jumps === 2) burst(p.x + p.w / 2, p.y + p.h, "#74c0fc"); }
     p.jumpHeld = wantJump;

@@ -9,7 +9,7 @@
   <script>
 const c = document.getElementById("c"), ctx = c.getContext("2d");
 const ground = 360;
-const p = { x: 60, y: ground - 24, w: 20, h: 24 };
+const p = { x: 60, y: ground - 24, w: 20, h: 24, vy: 0, grounded: true };
 const keys = {};
 addEventListener("keydown", e => { keys[e.code] = true; });
 addEventListener("keyup", e => { keys[e.code] = false; });
@@ -20,7 +20,10 @@ resize();
 function draw() {
   const dir = (keys.ArrowRight || keys.KeyD ? 1 : 0) - (keys.ArrowLeft || keys.KeyA ? 1 : 0);
   p.x = Math.max(0, Math.min(c.width - p.w, p.x + dir * 220 * (1 / 60)));
-
+if ((keys.Space || keys.ArrowUp || keys.KeyW) && p.grounded) { p.vy = -620; p.grounded = false; }
+  p.vy += 1600 * (1 / 60);
+  p.y += p.vy * (1 / 60);
+  if (p.y >= ground - p.h) { p.y = ground - p.h; p.vy = 0; p.grounded = true; }
   ctx.fillStyle = "#191a2e"; ctx.fillRect(0, 0, c.width, c.height);
   ctx.fillStyle = "#38b000"; ctx.fillRect(0, ground, c.width, c.height - ground);
   ctx.fillStyle = "#e03131"; ctx.fillRect(p.x, p.y, p.w, p.h);

@@ -18,7 +18,7 @@ function sfx(f, d = 0.09, t = "square") {
   g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + d);
   o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime + d);
 }
-const sparks = [];
+const sparks = [], trail = [];
 function burst(x, y, col) {
   for (let i = 0; i < 8; i++) sparks.push({ x, y, vx: (Math.random() - 0.5) * 240, vy: (Math.random() - 0.8) * 240, col, t: 0.3 });
 }
@@ -30,7 +30,7 @@ const goal = { x: 640, y: ground - 64, w: 6, h: 64 };
 let stage = 1, score = 0, best = Number(localStorage.getItem("zephrys_best") || 0), lives = 3, dead = false, won = false, paused = false, camX = 0, shake = 0;
 const p = { x: 60, y: ground - 24, w: 20, h: 24, vy: 0, grounded: true, jumps: 0, jumpHeld: false, coyote: 0, buf: 0, invuln: 0, facing: 1, dash: 0, dashCd: 0, dashHeld: false };
 function loadStage(n) {
-  stage = n; p.x = 60; p.y = ground - p.h; p.vy = 0; p.jumps = 0; p.coyote = 0; p.buf = 0; p.invuln = 0; p.facing = 1; p.dash = 0; p.dashCd = 0; camX = 0; shake = 0;
+  stage = n; p.x = 60; p.y = ground - p.h; p.vy = 0; p.jumps = 0; p.coyote = 0; p.buf = 0; p.invuln = 0; p.facing = 1; p.dash = 0; p.dashCd = 0; camX = 0; shake = 0; trail.length = 0;
   plats = n === 1 ? [{ x: 220, y: 270, w: 120, h: 18 }, { x: 380, y: 210, w: 110, h: 18, vx: 70, minX: 350, maxX: 520 }, { x: 560, y: 280, w: 110, h: 18, vy: -55, minY: 190, maxY: 300 }] : n === 2 ? [{ x: 190, y: 265, w: 100, h: 18, vx: 85, minX: 170, maxX: 310 }, { x: 380, y: 210, w: 100, h: 18, vy: 65, minY: 165, maxY: 285 }, { x: 540, y: 245, w: 110, h: 18, vx: -80, minX: 500, maxX: 670 }] : [{ x: 180, y: 260, w: 95, h: 18, vx: 105, minX: 160, maxX: 320 }, { x: 360, y: 200, w: 95, h: 18, vy: -80, minY: 150, maxY: 280 }, { x: 520, y: 220, w: 95, h: 18, vx: -105, minX: 480, maxX: 660 }, { x: 700, y: 275, w: 100, h: 18 }];
   coins = n === 1 ? [{ x: 280, y: 235, r: 8, taken: false }, { x: 460, y: 175, r: 8, taken: false }, { x: 615, y: 245, r: 8, taken: false }] : n === 2 ? [{ x: 240, y: 230, r: 8, taken: false }, { x: 430, y: 165, r: 8, taken: false }, { x: 595, y: 210, r: 8, taken: false }] : [{ x: 230, y: 220, r: 8, taken: false }, { x: 410, y: 155, r: 8, taken: false }, { x: 570, y: 180, r: 8, taken: false }, { x: 750, y: 235, r: 8, taken: false }];
   pits = n === 1 ? [{ x: 150, w: 60 }, { x: 350, w: 70 }] : n === 2 ? [{ x: 130, w: 75 }, { x: 320, w: 80 }, { x: 490, w: 70 }] : [{ x: 130, w: 85 }, { x: 310, w: 95 }, { x: 490, w: 95 }, { x: 650, w: 80 }];
@@ -78,6 +78,7 @@ function draw() {
     const wantDash = keys.ShiftLeft || keys.ShiftRight || keys.KeyX;
     if (wantDash && !p.dashHeld && p.dashCd <= 0) { p.dash = 0.14; p.dashCd = 0.6; p.vy = 0; sfx(620, 0.08, "sawtooth"); burst(p.x + p.w / 2, p.y + p.h / 2, "#ffd166"); }
     p.dashHeld = wantDash;
+    if (p.dash > 0) trail.push({ x: p.x, y: p.y, w: p.w, h: p.h, a: 0.55 });
     p.x = Math.max(0, p.x + (p.dash > 0 ? p.facing * 560 : dir * 220) * (1 / 60));
     p.coyote = p.grounded ? 0.1 : Math.max(0, p.coyote - 1 / 60);
     p.buf = Math.max(0, p.buf - 1 / 60);
@@ -124,6 +125,7 @@ function draw() {
     }
     if (score > best) { best = score; localStorage.setItem("zephrys_best", best); }
     camX = Math.max(0, p.x - c.width * 0.35);
+    for (let i = trail.length - 1; i >= 0; i--) { trail[i].a -= 0.06; if (trail[i].a <= 0) trail.splice(i, 1); }
     for (let i = sparks.length - 1; i >= 0; i--) {
       const s = sparks[i]; s.x += s.vx * (1 / 60); s.y += s.vy * (1 / 60); s.vy += 600 * (1 / 60); s.t -= 1 / 60;
       if (s.t <= 0) sparks.splice(i, 1);
@@ -147,6 +149,7 @@ function draw() {
   ctx.fillStyle = "#e9ecef"; ctx.fillRect(goal.x, goal.y, goal.w, goal.h);
   ctx.fillStyle = "#2ec4b6"; ctx.fillRect(goal.x + goal.w, goal.y, 24, 16);
   if (foe.alive) { ctx.fillStyle = "#9c36b5"; ctx.fillRect(foe.x, foe.y, foe.w, foe.h); }
+  for (const g of trail) { ctx.fillStyle = `rgba(224,49,49,${g.a})`; ctx.fillRect(g.x, g.y, g.w, g.h); }
   if (p.invuln <= 0 || Math.floor(p.invuln * 16) % 2 === 0) { ctx.fillStyle = "#e03131"; ctx.fillRect(p.x, p.y, p.w, p.h); }
   for (const s of sparks) { ctx.fillStyle = s.col; ctx.fillRect(s.x - 2, s.y - 2, 4, 4); }
 

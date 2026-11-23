@@ -129,7 +129,7 @@ function draw() {
 
   ctx.restore();
   ctx.fillStyle = "#fff"; ctx.font = "bold 15px monospace";
-  ctx.fillText(`STAGE ${stage}   SCORE ${score}   LIVES ${lives}`, 16, 28);
+  ctx.fillText(`STAGE ${stage}   SCORE ${score}   BEST ${best}   LIVES ${lives}`, 16, 28);
   if (won) {
     ctx.fillStyle = "#ffd166"; ctx.font = "bold 24px monospace";
     ctx.fillText("YOU BEAT ZEPHRYS! PRESS R", 160, 170);

@@ -22,7 +22,7 @@ const foe = { x: 420, y: ground - 22, w: 22, h: 22, vx: -90, minX: 360, maxX: 54
 const goal = { x: 640, y: ground - 64, w: 6, h: 64 };
 let won = false;
 let camX = 0;
-const p = { x: 60, y: ground - 24, w: 20, h: 24, vy: 0, grounded: true };
+const p = { x: 60, y: ground - 24, w: 20, h: 24, vy: 0, grounded: true, jumps: 0, jumpHeld: false };
 function hurt() {
   lives -= 1;
   if (lives <= 0) { lives = 0; dead = true; }

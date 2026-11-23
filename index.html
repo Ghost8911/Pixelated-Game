@@ -53,6 +53,7 @@ resize();
 
 function draw() {
   if (!won && !dead) {
+    p.invuln = Math.max(0, p.invuln - 1 / 60);
     for (const pl of plats) {
       if (!pl.vx) continue;
       const dx = pl.vx * (1 / 60); pl.x += dx;
@@ -122,7 +123,7 @@ function draw() {
   ctx.fillStyle = "#e9ecef"; ctx.fillRect(goal.x, goal.y, goal.w, goal.h);
   ctx.fillStyle = "#2ec4b6"; ctx.fillRect(goal.x + goal.w, goal.y, 24, 16);
   if (foe.alive) { ctx.fillStyle = "#9c36b5"; ctx.fillRect(foe.x, foe.y, foe.w, foe.h); }
-  ctx.fillStyle = "#e03131"; ctx.fillRect(p.x, p.y, p.w, p.h);
+  if (p.invuln <= 0 || Math.floor(p.invuln * 16) % 2 === 0) { ctx.fillStyle = "#e03131"; ctx.fillRect(p.x, p.y, p.w, p.h); }
   for (const s of sparks) { ctx.fillStyle = s.col; ctx.fillRect(s.x - 2, s.y - 2, 4, 4); }
 
   ctx.restore();

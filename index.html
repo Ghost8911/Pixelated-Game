@@ -156,6 +156,9 @@ function draw() {
   ctx.restore();
   ctx.fillStyle = "#fff"; ctx.font = "bold 15px monospace";
   ctx.fillText(`STAGE ${stage}/3   SCORE ${score}   BEST ${best}   LIVES ${lives}   ${muted ? "MUTED" : "SFX"} [M]   [P] PAUSE`, 16, 28);
+  const ready = Math.max(0, 1 - p.dashCd / 0.6);
+  ctx.fillStyle = "#343a40"; ctx.fillRect(16, 36, 90, 6);
+  ctx.fillStyle = ready >= 1 ? "#ffd166" : "#74c0fc"; ctx.fillRect(16, 36, 90 * ready, 6);
   if (paused) {
     ctx.fillStyle = "#74c0fc"; ctx.font = "bold 24px monospace";
     ctx.fillText("PAUSED! PRESS P", 195, 170);

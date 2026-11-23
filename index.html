@@ -53,7 +53,7 @@ resize();
 
 function draw() {
   if (!won && !dead) {
-    p.invuln = Math.max(0, p.invuln - 1 / 60);
+    p.invuln = Math.max(0, p.invuln - 1 / 60); p.dash = Math.max(0, p.dash - 1 / 60); p.dashCd = Math.max(0, p.dashCd - 1 / 60);
     for (const pl of plats) {
       if (!pl.vx) continue;
       const dx = pl.vx * (1 / 60); pl.x += dx;
@@ -61,7 +61,11 @@ function draw() {
       if (p.grounded && Math.abs(p.y + p.h - pl.y) < 2 && p.x + p.w > pl.x && p.x < pl.x + pl.w) p.x += dx;
     }
     const dir = (keys.ArrowRight || keys.KeyD ? 1 : 0) - (keys.ArrowLeft || keys.KeyA ? 1 : 0);
-    p.x = Math.max(0, p.x + dir * 220 * (1 / 60));
+    if (dir) p.facing = dir;
+    const wantDash = keys.ShiftLeft || keys.ShiftRight || keys.KeyX;
+    if (wantDash && !p.dashHeld && p.dashCd <= 0) { p.dash = 0.14; p.dashCd = 0.6; p.vy = 0; sfx(620, 0.08, "sawtooth"); burst(p.x + p.w / 2, p.y + p.h / 2, "#ffd166"); }
+    p.dashHeld = wantDash;
+    p.x = Math.max(0, p.x + (p.dash > 0 ? p.facing * 560 : dir * 220) * (1 / 60));
     p.coyote = p.grounded ? 0.1 : Math.max(0, p.coyote - 1 / 60);
     p.buf = Math.max(0, p.buf - 1 / 60);
     const wantJump = keys.Space || keys.ArrowUp || keys.KeyW;
@@ -70,7 +74,7 @@ function draw() {
     p.jumpHeld = wantJump;
     const prevY = p.y;
     p.grounded = false;
-    p.vy += 1600 * (1 / 60);
+    if (p.dash <= 0) p.vy += 1600 * (1 / 60);
     p.y += p.vy * (1 / 60);
     const overPit = pits.some(pt => p.x + p.w > pt.x && p.x < pt.x + pt.w);
     if (!overPit && p.y >= ground - p.h) { p.y = ground - p.h; p.vy = 0; p.grounded = true; p.jumps = 0; }
